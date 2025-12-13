@@ -183,6 +183,116 @@
             object-fit: cover;
             border-radius: 16px;
         }
+        /* Image carousel styles */
+        .image-carousel {
+            position: relative;
+            width: 100%;
+            overflow: hidden;
+            border-radius: 16px;
+        }
+        .carousel-container {
+            display: flex;
+            transition: transform 0.3s ease;
+        }
+        .carousel-item {
+            min-width: 100%;
+            max-height: 400px;
+        }
+        .carousel-item img {
+            width: 100%;
+            height: 400px;
+            object-fit: cover;
+        }
+        .carousel-btn {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255,255,255,0.8);
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            z-index: 10;
+        }
+        .carousel-btn:hover {
+            background: white;
+        }
+        .carousel-prev { left: 10px; }
+        .carousel-next { right: 10px; }
+        .carousel-indicators {
+            position: absolute;
+            bottom: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+        }
+        .carousel-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.5);
+            cursor: pointer;
+            border: none;
+        }
+        .carousel-indicator.active {
+            background: white;
+        }
+        /* Multi-image upload preview */
+        .image-preview-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .image-preview-item {
+            position: relative;
+            width: 100px;
+            height: 100px;
+        }
+        .image-preview-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 8px;
+        }
+        .image-preview-item .remove-btn {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        /* Notification toast */
+        .toast-container {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            z-index: 9999;
+        }
+        .toast-notification {
+            background: white;
+            border-radius: 12px;
+            padding: 15px 20px;
+            margin-bottom: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            animation: slideIn 0.3s ease;
+            max-width: 350px;
+        }
+        .toast-notification.success { border-left: 4px solid var(--secondary-color); }
+        .toast-notification.info { border-left: 4px solid #17a2b8; }
+        .toast-notification.warning { border-left: 4px solid #ffc107; }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
         .placeholder-img {
             width: 100%;
             height: 220px;
@@ -232,6 +342,9 @@
     </style>
 </head>
 <body>
+    <!-- Toast notification container -->
+    <div class="toast-container" id="toastContainer"></div>
+
     <div id="app">
         <!-- Navbar -->
         <nav class="navbar navbar-expand-lg navbar-dark">
@@ -928,7 +1041,30 @@
                     <div class="modal-body">
                         <div class="row">
                             <div class="col-md-6">
-                                <img :src="selectedPet.image_url || '/static/images/default-pet.png'"
+                                <!-- Image Carousel for multiple images -->
+                                <div class="image-carousel" v-if="selectedPet.images && selectedPet.images.length > 0">
+                                    <div class="carousel-container" :style="{transform: `translateX(-${currentImageIndex * 100}%)`}">
+                                        <div class="carousel-item" v-for="(img, idx) in selectedPet.images" :key="idx">
+                                            <img :src="img.image_url" :alt="selectedPet.name">
+                                        </div>
+                                    </div>
+                                    <button class="carousel-btn carousel-prev" @click="prevImage" v-if="selectedPet.images.length > 1">
+                                        <i class="bi bi-chevron-left"></i>
+                                    </button>
+                                    <button class="carousel-btn carousel-next" @click="nextImage" v-if="selectedPet.images.length > 1">
+                                        <i class="bi bi-chevron-right"></i>
+                                    </button>
+                                    <div class="carousel-indicators" v-if="selectedPet.images.length > 1">
+                                        <button class="carousel-indicator"
+                                                v-for="(img, idx) in selectedPet.images"
+                                                :key="idx"
+                                                :class="{active: currentImageIndex === idx}"
+                                                @click="currentImageIndex = idx">
+                                        </button>
+                                    </div>
+                                </div>
+                                <!-- Fallback single image -->
+                                <img v-else :src="selectedPet.image_url || '/static/images/default-pet.png'"
                                      class="detail-img mb-3" :alt="selectedPet.name">
                             </div>
                             <div class="col-md-6">
@@ -1165,8 +1301,16 @@
                                     <input type="text" class="form-control" v-model="newPet.location">
                                 </div>
                                 <div class="col-md-6 mb-3">
-                                    <label class="form-label">{{ t('addPet.photo') }}</label>
-                                    <input type="file" class="form-control" @change="handleFileSelect" accept="image/*">
+                                    <label class="form-label">{{ t('addPet.photos') }}</label>
+                                    <input type="file" class="form-control" @change="handleMultiFileSelect" accept="image/*" multiple>
+                                    <small class="text-muted">{{ t('addPet.photosHint') }}</small>
+                                    <!-- Image preview -->
+                                    <div class="image-preview-container" v-if="selectedFiles.length > 0">
+                                        <div class="image-preview-item" v-for="(file, idx) in selectedFilePreviews" :key="idx">
+                                            <img :src="file.url" :alt="file.name">
+                                            <button type="button" class="remove-btn" @click="removeSelectedFile(idx)">×</button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             <div class="mb-3">
@@ -1386,6 +1530,8 @@
                     description: 'Description',
                     location: 'Location',
                     photo: 'Photo',
+                    photos: 'Photos',
+                    photosHint: 'You can select multiple images',
                     requirements: 'Adoption Requirements',
                     submit: 'Add Pet'
                 },
@@ -1611,6 +1757,8 @@
                     description: '描述',
                     location: '位置',
                     photo: '照片',
+                    photos: '照片',
+                    photosHint: '可以选择多张图片',
                     requirements: '领养要求',
                     submit: '添加宠物'
                 },
@@ -1726,6 +1874,10 @@
                     description: '', is_neutered: false, is_vaccinated: false, location: '', adoption_requirements: ''
                 });
                 const selectedFile = ref(null);
+                const selectedFiles = ref([]);
+                const selectedFilePreviews = ref([]);
+                const currentImageIndex = ref(0);
+                let websocket = null;
 
                 // Errors
                 const loginError = ref('');
@@ -1769,6 +1921,7 @@
                         loadApplications();
                         loadPreferences();
                         loadUnreadCount();
+                        connectWebSocket(); // Connect WebSocket after login
                     } catch (e) {
                         loginError.value = e.message;
                     }
@@ -1883,6 +2036,7 @@
                 // Actions
                 const showPetDetail = (pet) => {
                     selectedPet.value = pet;
+                    currentImageIndex.value = 0; // Reset image carousel
                     showDetailModal.value = true;
                     recordView(pet.id);
                 };
@@ -1950,6 +2104,163 @@
                     selectedFile.value = e.target.files[0];
                 };
 
+                // Multi-file upload handling
+                const handleMultiFileSelect = (e) => {
+                    const files = Array.from(e.target.files);
+                    selectedFiles.value = [...selectedFiles.value, ...files];
+
+                    // Create preview URLs
+                    files.forEach(file => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            selectedFilePreviews.value.push({
+                                name: file.name,
+                                url: e.target.result
+                            });
+                        };
+                        reader.readAsDataURL(file);
+                    });
+                };
+
+                const removeSelectedFile = (idx) => {
+                    selectedFiles.value.splice(idx, 1);
+                    selectedFilePreviews.value.splice(idx, 1);
+                };
+
+                // Image carousel functions
+                const prevImage = () => {
+                    if (selectedPet.value && selectedPet.value.images) {
+                        currentImageIndex.value = (currentImageIndex.value - 1 + selectedPet.value.images.length) % selectedPet.value.images.length;
+                    }
+                };
+
+                const nextImage = () => {
+                    if (selectedPet.value && selectedPet.value.images) {
+                        currentImageIndex.value = (currentImageIndex.value + 1) % selectedPet.value.images.length;
+                    }
+                };
+
+                // Toast notification function
+                const showToast = (message, type = 'info') => {
+                    const container = document.getElementById('toastContainer');
+                    const toast = document.createElement('div');
+                    toast.className = `toast-notification ${type}`;
+                    toast.innerHTML = `
+                        <div class="d-flex align-items-center">
+                            <i class="bi ${type === 'success' ? 'bi-check-circle-fill text-success' : type === 'warning' ? 'bi-exclamation-triangle-fill text-warning' : 'bi-info-circle-fill text-info'} me-2"></i>
+                            <span>${message}</span>
+                        </div>
+                    `;
+                    container.appendChild(toast);
+                    setTimeout(() => {
+                        toast.style.opacity = '0';
+                        setTimeout(() => toast.remove(), 300);
+                    }, 5000);
+                };
+
+                // WebSocket connection
+                const connectWebSocket = () => {
+                    const token = localStorage.getItem('token');
+                    if (!token) return;
+
+                    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                    const wsUrl = `${protocol}//${window.location.host}/ws/${token}`;
+
+                    try {
+                        websocket = new WebSocket(wsUrl);
+
+                        websocket.onopen = () => {
+                            console.log('WebSocket connected');
+                            // Start heartbeat
+                            setInterval(() => {
+                                if (websocket && websocket.readyState === WebSocket.OPEN) {
+                                    websocket.send('ping');
+                                }
+                            }, 30000);
+                        };
+
+                        websocket.onmessage = (event) => {
+                            if (event.data === 'pong') return; // Heartbeat response
+
+                            try {
+                                const data = JSON.parse(event.data);
+                                handleWebSocketMessage(data);
+                            } catch (e) {
+                                console.error('Failed to parse WebSocket message:', e);
+                            }
+                        };
+
+                        websocket.onclose = () => {
+                            console.log('WebSocket disconnected');
+                            // Reconnect after 5 seconds
+                            setTimeout(connectWebSocket, 5000);
+                        };
+
+                        websocket.onerror = (error) => {
+                            console.error('WebSocket error:', error);
+                        };
+                    } catch (e) {
+                        console.error('Failed to connect WebSocket:', e);
+                    }
+                };
+
+                const handleWebSocketMessage = (data) => {
+                    switch (data.type) {
+                        case 'new_message':
+                            showToast(
+                                lang.value === 'zh'
+                                    ? `${data.data.sender_name} 发来新消息: ${data.data.content.substring(0, 50)}...`
+                                    : `New message from ${data.data.sender_name}: ${data.data.content.substring(0, 50)}...`,
+                                'info'
+                            );
+                            loadUnreadCount();
+                            if (currentView.value === 'messages' && currentChat.value?.partner_id === data.data.sender_id) {
+                                openChat(data.data.sender_id);
+                            }
+                            break;
+
+                        case 'new_application':
+                            showToast(
+                                lang.value === 'zh'
+                                    ? `${data.data.applicant_name} 申请领养 ${data.data.pet_name}`
+                                    : `${data.data.applicant_name} applied to adopt ${data.data.pet_name}`,
+                                'success'
+                            );
+                            loadApplications();
+                            break;
+
+                        case 'application_status_update':
+                            const statusText = {
+                                pending: lang.value === 'zh' ? '待审核' : 'Pending',
+                                approved: lang.value === 'zh' ? '已通过' : 'Approved',
+                                rejected: lang.value === 'zh' ? '已拒绝' : 'Rejected',
+                                completed: lang.value === 'zh' ? '已完成' : 'Completed'
+                            };
+                            showToast(
+                                lang.value === 'zh'
+                                    ? `您对 ${data.data.pet_name} 的领养申请状态已更新为: ${statusText[data.data.status]}`
+                                    : `Your application for ${data.data.pet_name} is now: ${statusText[data.data.status]}`,
+                                data.data.status === 'approved' || data.data.status === 'completed' ? 'success' : 'info'
+                            );
+                            loadApplications();
+                            break;
+
+                        case 'new_pet':
+                            showToast(
+                                lang.value === 'zh'
+                                    ? `新宠物上架: ${data.data.name}`
+                                    : `New pet available: ${data.data.name}`,
+                                'info'
+                            );
+                            loadPets();
+                            break;
+
+                        case 'typing':
+                            // Show typing indicator (optional)
+                            break;
+                    }
+                };
+
                 const addPet = async () => {
                     try {
                         addPetError.value = '';
@@ -1957,8 +2268,13 @@
                         Object.keys(newPet.value).forEach(key => {
                             formData.append(key, newPet.value[key]);
                         });
-                        if (selectedFile.value) {
-                            formData.append('image', selectedFile.value);
+                        // Support multiple images
+                        if (selectedFiles.value.length > 0) {
+                            selectedFiles.value.forEach(file => {
+                                formData.append('images', file);
+                            });
+                        } else if (selectedFile.value) {
+                            formData.append('images', selectedFile.value);
                         }
                         await api('/api/pets', {
                             method: 'POST',
@@ -1970,9 +2286,11 @@
                             description: '', is_neutered: false, is_vaccinated: false, location: '', adoption_requirements: ''
                         };
                         selectedFile.value = null;
+                        selectedFiles.value = [];
+                        selectedFilePreviews.value = [];
                         loadPets();
                         loadMyPets();
-                        alert(t('messages.petAdded'));
+                        showToast(t('messages.petAdded'), 'success');
                     } catch (e) {
                         addPetError.value = e.message;
                     }
@@ -2176,23 +2494,28 @@
                     checkAuth();
                     loadPets();
                     loadStats();
+                    // Connect WebSocket if logged in
+                    if (localStorage.getItem('token')) {
+                        connectWebSocket();
+                    }
                 });
 
                 return {
                     lang, t, toggleLang,
                     currentView, user, pets, myPets, favorites, applications, stats, selectedPet, preferences, prefTypes,
                     conversations, currentChat, newMessage, profileUser, petComments, newComment, unreadCount, editPhone, editAddress,
-                    browsingHistory,
+                    browsingHistory, currentImageIndex, selectedFiles, selectedFilePreviews,
                     showLoginModal, showRegisterModal, showDetailModal, showApplicationForm, showAddPetModal,
                     loginForm, registerForm, applicationForm, newPet,
                     loginError, registerError, applicationError, addPetError,
                     filters,
                     login, register, logout, loadPets, showPetDetail, toggleFavorite, isFavorite,
-                    submitApplication, updateApplicationStatus, savePreferences, handleFileSelect, addPet, deletePet,
+                    submitApplication, updateApplicationStatus, savePreferences, handleFileSelect, handleMultiFileSelect, removeSelectedFile, addPet, deletePet,
                     debounceSearch, formatAge, formatDate, formatDateTime, handleImageError,
                     loadMessages, openChat, sendMessage, startChat, contactOwner,
                     viewProfile, updateProfile, loadComments, addComment,
-                    loadHistory, clearHistory, removeFromHistory
+                    loadHistory, clearHistory, removeFromHistory,
+                    prevImage, nextImage, connectWebSocket
                 };
             }
         }).mount('#app');

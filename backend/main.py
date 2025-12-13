@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status, File, UploadFile, Form, Request
+from fastapi import FastAPI, Depends, HTTPException, status, File, UploadFile, Form, Request, WebSocket, WebSocketDisconnect
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse
@@ -8,21 +8,43 @@ from sqlalchemy.orm import sessionmaker, Session, relationship
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
-from typing import Optional, List
+from typing import Optional, List, Dict
 from pydantic import BaseModel
 import enum
 import os
 import uuid
 import shutil
+import json
+import asyncio
 
 # Configuration
 SECRET_KEY = "pet-adoption-secret-key-2024"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 
-# Database setup
-DATABASE_URL = "sqlite:///./pet_adoption.db"
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+# Database setup - MySQL
+# 格式: mysql+pymysql://用户名:密码@主机:端口/数据库名
+MYSQL_USER = os.getenv("MYSQL_USER", "root")
+MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "password")
+MYSQL_HOST = os.getenv("MYSQL_HOST", "localhost")
+MYSQL_PORT = os.getenv("MYSQL_PORT", "3306")
+MYSQL_DATABASE = os.getenv("MYSQL_DATABASE", "pet_adoption")
+
+DATABASE_URL = f"mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}?charset=utf8mb4"
+
+# 如果MySQL连接失败，回退到SQLite（开发环境）
+try:
+    engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_recycle=3600)
+    # 测试连接
+    with engine.connect() as conn:
+        pass
+    print("Connected to MySQL database")
+except Exception as e:
+    print(f"MySQL connection failed: {e}")
+    print("Falling back to SQLite...")
+    DATABASE_URL = "sqlite:///./pet_adoption.db"
+    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -31,6 +53,47 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Security
 security = HTTPBearer(auto_error=False)
+
+# WebSocket Connection Manager
+class ConnectionManager:
+    def __init__(self):
+        # user_id -> list of WebSocket connections
+        self.active_connections: Dict[int, List[WebSocket]] = {}
+
+    async def connect(self, websocket: WebSocket, user_id: int):
+        await websocket.accept()
+        if user_id not in self.active_connections:
+            self.active_connections[user_id] = []
+        self.active_connections[user_id].append(websocket)
+        print(f"User {user_id} connected. Total connections: {len(self.active_connections[user_id])}")
+
+    def disconnect(self, websocket: WebSocket, user_id: int):
+        if user_id in self.active_connections:
+            if websocket in self.active_connections[user_id]:
+                self.active_connections[user_id].remove(websocket)
+            if not self.active_connections[user_id]:
+                del self.active_connections[user_id]
+        print(f"User {user_id} disconnected")
+
+    async def send_personal_message(self, message: dict, user_id: int):
+        """Send message to a specific user"""
+        if user_id in self.active_connections:
+            for connection in self.active_connections[user_id]:
+                try:
+                    await connection.send_json(message)
+                except Exception as e:
+                    print(f"Error sending message to user {user_id}: {e}")
+
+    async def broadcast(self, message: dict):
+        """Broadcast message to all connected users"""
+        for user_id, connections in self.active_connections.items():
+            for connection in connections:
+                try:
+                    await connection.send_json(message)
+                except Exception as e:
+                    print(f"Error broadcasting to user {user_id}: {e}")
+
+manager = ConnectionManager()
 
 # Enums
 class UserRole(str, enum.Enum):
@@ -83,7 +146,7 @@ class Pet(Base):
     is_neutered = Column(Boolean, default=False)
     is_vaccinated = Column(Boolean, default=False)
     health_notes = Column(Text, nullable=True)
-    image_url = Column(String(500), nullable=True)
+    image_url = Column(String(500), nullable=True)  # 主图片（兼容旧数据）
     location = Column(String(200), nullable=True)
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
@@ -94,6 +157,19 @@ class Pet(Base):
 
     owner = relationship("User", back_populates="pets")
     applications = relationship("AdoptionApplication", back_populates="pet")
+    images = relationship("PetImage", back_populates="pet", cascade="all, delete-orphan")
+
+# 新增：宠物图片表（支持多图上传）
+class PetImage(Base):
+    __tablename__ = "pet_images"
+    id = Column(Integer, primary_key=True, index=True)
+    pet_id = Column(Integer, ForeignKey("pets.id", ondelete="CASCADE"))
+    image_url = Column(String(500))
+    is_primary = Column(Boolean, default=False)  # 是否为主图
+    sort_order = Column(Integer, default=0)  # 排序顺序
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    pet = relationship("Pet", back_populates="images")
 
 class AdoptionApplication(Base):
     __tablename__ = "adoption_applications"
@@ -191,6 +267,15 @@ class UserResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class PetImageResponse(BaseModel):
+    id: int
+    image_url: str
+    is_primary: bool
+    sort_order: int
+
+    class Config:
+        from_attributes = True
+
 class PetCreate(BaseModel):
     name: str
     pet_type: str
@@ -216,6 +301,7 @@ class PetResponse(BaseModel):
     is_vaccinated: bool
     health_notes: Optional[str]
     image_url: Optional[str]
+    images: List[PetImageResponse] = []
     location: Optional[str]
     adoption_requirements: Optional[str]
     is_available: bool
@@ -241,7 +327,7 @@ class PreferenceUpdate(BaseModel):
     prefer_neutered: Optional[bool] = None
 
 # FastAPI app
-app = FastAPI(title="Pet Adoption System", version="1.0.0")
+app = FastAPI(title="Pet Adoption System", version="2.0.0")
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -286,6 +372,18 @@ def require_auth(credentials: HTTPAuthorizationCredentials = Depends(security), 
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
     return user
+
+def get_user_from_token(token: str, db: Session) -> Optional[User]:
+    """从token获取用户（用于WebSocket认证）"""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            return None
+        user = db.query(User).filter(User.email == email).first()
+        return user
+    except JWTError:
+        return None
 
 # Matching algorithm
 def calculate_match_score(pet: Pet, preference: UserPreference) -> int:
@@ -389,8 +487,26 @@ def list_pets(
         preference = db.query(UserPreference).filter(UserPreference.user_id == current_user.id).first()
 
     for pet in pets:
-        pet_dict = PetResponse.model_validate(pet).model_dump()
-        pet_dict["match_score"] = calculate_match_score(pet, preference)
+        pet_dict = {
+            "id": pet.id,
+            "name": pet.name,
+            "pet_type": pet.pet_type,
+            "breed": pet.breed,
+            "age_months": pet.age_months,
+            "gender": pet.gender,
+            "description": pet.description,
+            "is_neutered": pet.is_neutered,
+            "is_vaccinated": pet.is_vaccinated,
+            "health_notes": pet.health_notes,
+            "image_url": pet.image_url,
+            "images": [{"id": img.id, "image_url": img.image_url, "is_primary": img.is_primary, "sort_order": img.sort_order} for img in pet.images],
+            "location": pet.location,
+            "adoption_requirements": pet.adoption_requirements,
+            "is_available": pet.is_available,
+            "created_at": pet.created_at,
+            "owner_id": pet.owner_id,
+            "match_score": calculate_match_score(pet, preference)
+        }
         result.append(pet_dict)
 
     # Sort by match score
@@ -402,7 +518,26 @@ def get_pet(pet_id: int, db: Session = Depends(get_db)):
     pet = db.query(Pet).filter(Pet.id == pet_id).first()
     if not pet:
         raise HTTPException(status_code=404, detail="Pet not found")
-    return PetResponse.model_validate(pet)
+
+    return {
+        "id": pet.id,
+        "name": pet.name,
+        "pet_type": pet.pet_type,
+        "breed": pet.breed,
+        "age_months": pet.age_months,
+        "gender": pet.gender,
+        "description": pet.description,
+        "is_neutered": pet.is_neutered,
+        "is_vaccinated": pet.is_vaccinated,
+        "health_notes": pet.health_notes,
+        "image_url": pet.image_url,
+        "images": [{"id": img.id, "image_url": img.image_url, "is_primary": img.is_primary, "sort_order": img.sort_order} for img in pet.images],
+        "location": pet.location,
+        "adoption_requirements": pet.adoption_requirements,
+        "is_available": pet.is_available,
+        "created_at": pet.created_at,
+        "owner_id": pet.owner_id
+    }
 
 @app.post("/api/pets")
 async def create_pet(
@@ -417,22 +552,14 @@ async def create_pet(
     health_notes: str = Form(None),
     location: str = Form(None),
     adoption_requirements: str = Form(None),
-    image: UploadFile = File(None),
+    images: List[UploadFile] = File(None),  # 支持多图上传
     db: Session = Depends(get_db),
     current_user: User = Depends(require_auth)
 ):
     if current_user.role not in [UserRole.SHELTER.value, UserRole.ADMIN.value]:
         raise HTTPException(status_code=403, detail="Only shelters can post pets")
 
-    image_url = None
-    if image:
-        ext = os.path.splitext(image.filename)[1]
-        filename = f"{uuid.uuid4()}{ext}"
-        filepath = f"media/pets/{filename}"
-        with open(filepath, "wb") as f:
-            shutil.copyfileobj(image.file, f)
-        image_url = f"/media/pets/{filename}"
-
+    # 创建宠物记录
     pet = Pet(
         name=name,
         pet_type=pet_type,
@@ -445,13 +572,195 @@ async def create_pet(
         health_notes=health_notes,
         location=location,
         adoption_requirements=adoption_requirements,
-        image_url=image_url,
         owner_id=current_user.id
     )
     db.add(pet)
     db.commit()
     db.refresh(pet)
-    return PetResponse.model_validate(pet)
+
+    # 处理多图上传
+    if images:
+        for idx, image in enumerate(images):
+            if image.filename:  # 确保文件有效
+                ext = os.path.splitext(image.filename)[1]
+                filename = f"{uuid.uuid4()}{ext}"
+                filepath = f"media/pets/{filename}"
+
+                # 确保目录存在
+                os.makedirs("media/pets", exist_ok=True)
+
+                with open(filepath, "wb") as f:
+                    shutil.copyfileobj(image.file, f)
+
+                image_url = f"/media/pets/{filename}"
+
+                # 创建图片记录
+                pet_image = PetImage(
+                    pet_id=pet.id,
+                    image_url=image_url,
+                    is_primary=(idx == 0),  # 第一张为主图
+                    sort_order=idx
+                )
+                db.add(pet_image)
+
+                # 设置主图URL到pet记录（兼容旧版本）
+                if idx == 0:
+                    pet.image_url = image_url
+
+        db.commit()
+        db.refresh(pet)
+
+    # 广播新宠物消息
+    await manager.broadcast({
+        "type": "new_pet",
+        "data": {
+            "id": pet.id,
+            "name": pet.name,
+            "pet_type": pet.pet_type,
+            "image_url": pet.image_url
+        }
+    })
+
+    return {
+        "id": pet.id,
+        "name": pet.name,
+        "pet_type": pet.pet_type,
+        "breed": pet.breed,
+        "age_months": pet.age_months,
+        "gender": pet.gender,
+        "description": pet.description,
+        "is_neutered": pet.is_neutered,
+        "is_vaccinated": pet.is_vaccinated,
+        "health_notes": pet.health_notes,
+        "image_url": pet.image_url,
+        "images": [{"id": img.id, "image_url": img.image_url, "is_primary": img.is_primary, "sort_order": img.sort_order} for img in pet.images],
+        "location": pet.location,
+        "adoption_requirements": pet.adoption_requirements,
+        "is_available": pet.is_available,
+        "created_at": pet.created_at,
+        "owner_id": pet.owner_id
+    }
+
+# 新增：上传宠物图片API
+@app.post("/api/pets/{pet_id}/images")
+async def upload_pet_images(
+    pet_id: int,
+    images: List[UploadFile] = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
+):
+    pet = db.query(Pet).filter(Pet.id == pet_id).first()
+    if not pet:
+        raise HTTPException(status_code=404, detail="Pet not found")
+    if pet.owner_id != current_user.id and current_user.role != UserRole.ADMIN.value:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    # 获取当前图片数量以确定排序
+    existing_count = db.query(PetImage).filter(PetImage.pet_id == pet_id).count()
+
+    uploaded_images = []
+    for idx, image in enumerate(images):
+        if image.filename:
+            ext = os.path.splitext(image.filename)[1]
+            filename = f"{uuid.uuid4()}{ext}"
+            filepath = f"media/pets/{filename}"
+
+            os.makedirs("media/pets", exist_ok=True)
+
+            with open(filepath, "wb") as f:
+                shutil.copyfileobj(image.file, f)
+
+            image_url = f"/media/pets/{filename}"
+
+            pet_image = PetImage(
+                pet_id=pet_id,
+                image_url=image_url,
+                is_primary=(existing_count == 0 and idx == 0),
+                sort_order=existing_count + idx
+            )
+            db.add(pet_image)
+            uploaded_images.append(pet_image)
+
+            # 如果是第一张图片且宠物没有主图，设置为主图
+            if existing_count == 0 and idx == 0:
+                pet.image_url = image_url
+
+    db.commit()
+
+    return {"message": f"Uploaded {len(uploaded_images)} images", "images": [
+        {"id": img.id, "image_url": img.image_url, "is_primary": img.is_primary}
+        for img in uploaded_images
+    ]}
+
+# 新增：删除宠物图片API
+@app.delete("/api/pets/{pet_id}/images/{image_id}")
+async def delete_pet_image(
+    pet_id: int,
+    image_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
+):
+    pet = db.query(Pet).filter(Pet.id == pet_id).first()
+    if not pet:
+        raise HTTPException(status_code=404, detail="Pet not found")
+    if pet.owner_id != current_user.id and current_user.role != UserRole.ADMIN.value:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    image = db.query(PetImage).filter(PetImage.id == image_id, PetImage.pet_id == pet_id).first()
+    if not image:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    # 删除文件
+    try:
+        file_path = image.image_url.lstrip("/")
+        if os.path.exists(file_path):
+            os.remove(file_path)
+    except Exception as e:
+        print(f"Error deleting file: {e}")
+
+    # 如果删除的是主图，设置下一张为主图
+    was_primary = image.is_primary
+    db.delete(image)
+    db.commit()
+
+    if was_primary:
+        next_image = db.query(PetImage).filter(PetImage.pet_id == pet_id).order_by(PetImage.sort_order).first()
+        if next_image:
+            next_image.is_primary = True
+            pet.image_url = next_image.image_url
+        else:
+            pet.image_url = None
+        db.commit()
+
+    return {"message": "Image deleted"}
+
+# 新增：设置主图API
+@app.put("/api/pets/{pet_id}/images/{image_id}/primary")
+async def set_primary_image(
+    pet_id: int,
+    image_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
+):
+    pet = db.query(Pet).filter(Pet.id == pet_id).first()
+    if not pet:
+        raise HTTPException(status_code=404, detail="Pet not found")
+    if pet.owner_id != current_user.id and current_user.role != UserRole.ADMIN.value:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    # 取消所有图片的主图状态
+    db.query(PetImage).filter(PetImage.pet_id == pet_id).update({"is_primary": False})
+
+    # 设置新的主图
+    image = db.query(PetImage).filter(PetImage.id == image_id, PetImage.pet_id == pet_id).first()
+    if not image:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    image.is_primary = True
+    pet.image_url = image.image_url
+    db.commit()
+
+    return {"message": "Primary image updated"}
 
 @app.put("/api/pets/{pet_id}")
 def update_pet(pet_id: int, pet_data: PetCreate, db: Session = Depends(get_db), current_user: User = Depends(require_auth)):
@@ -474,12 +783,22 @@ def delete_pet(pet_id: int, db: Session = Depends(get_db), current_user: User = 
         raise HTTPException(status_code=404, detail="Pet not found")
     if pet.owner_id != current_user.id and current_user.role != UserRole.ADMIN.value:
         raise HTTPException(status_code=403, detail="Not authorized")
+
+    # 删除关联的图片文件
+    for image in pet.images:
+        try:
+            file_path = image.image_url.lstrip("/")
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except Exception as e:
+            print(f"Error deleting file: {e}")
+
     db.delete(pet)
     db.commit()
     return {"message": "Pet deleted"}
 
 @app.post("/api/applications")
-def create_application(app_data: ApplicationCreate, db: Session = Depends(get_db), current_user: User = Depends(require_auth)):
+async def create_application(app_data: ApplicationCreate, db: Session = Depends(get_db), current_user: User = Depends(require_auth)):
     pet = db.query(Pet).filter(Pet.id == app_data.pet_id).first()
     if not pet:
         raise HTTPException(status_code=404, detail="Pet not found")
@@ -506,6 +825,18 @@ def create_application(app_data: ApplicationCreate, db: Session = Depends(get_db
     db.add(application)
     db.commit()
     db.refresh(application)
+
+    # 通过WebSocket通知宠物主人有新申请
+    await manager.send_personal_message({
+        "type": "new_application",
+        "data": {
+            "application_id": application.id,
+            "pet_id": pet.id,
+            "pet_name": pet.name,
+            "applicant_name": current_user.username
+        }
+    }, pet.owner_id)
+
     return {"message": "Application submitted", "id": application.id}
 
 @app.get("/api/applications")
@@ -536,7 +867,7 @@ def list_applications(db: Session = Depends(get_db), current_user: User = Depend
     return result
 
 @app.put("/api/applications/{app_id}/status")
-def update_application_status(app_id: int, status: str, db: Session = Depends(get_db), current_user: User = Depends(require_auth)):
+async def update_application_status(app_id: int, status: str, db: Session = Depends(get_db), current_user: User = Depends(require_auth)):
     application = db.query(AdoptionApplication).filter(AdoptionApplication.id == app_id).first()
     if not application:
         raise HTTPException(status_code=404, detail="Application not found")
@@ -549,6 +880,18 @@ def update_application_status(app_id: int, status: str, db: Session = Depends(ge
     if status == ApplicationStatus.COMPLETED.value:
         pet.is_available = False
     db.commit()
+
+    # 通过WebSocket通知申请者状态更新
+    await manager.send_personal_message({
+        "type": "application_status_update",
+        "data": {
+            "application_id": application.id,
+            "pet_id": pet.id,
+            "pet_name": pet.name,
+            "status": status
+        }
+    }, application.applicant_id)
+
     return {"message": "Status updated"}
 
 @app.post("/api/favorites/{pet_id}")
@@ -626,7 +969,7 @@ def get_my_pets(db: Session = Depends(get_db), current_user: User = Depends(requ
 
 # Message APIs
 @app.post("/api/messages")
-def send_message(receiver_id: int, content: str, pet_id: Optional[int] = None,
+async def send_message(receiver_id: int, content: str, pet_id: Optional[int] = None,
                  db: Session = Depends(get_db), current_user: User = Depends(require_auth)):
     message = Message(
         sender_id=current_user.id,
@@ -637,6 +980,20 @@ def send_message(receiver_id: int, content: str, pet_id: Optional[int] = None,
     db.add(message)
     db.commit()
     db.refresh(message)
+
+    # 通过WebSocket实时推送消息给接收者
+    await manager.send_personal_message({
+        "type": "new_message",
+        "data": {
+            "id": message.id,
+            "sender_id": current_user.id,
+            "sender_name": current_user.username,
+            "content": content,
+            "pet_id": pet_id,
+            "created_at": message.created_at.isoformat()
+        }
+    }, receiver_id)
+
     return {"message": "Message sent", "id": message.id}
 
 @app.get("/api/messages")
@@ -844,6 +1201,51 @@ def remove_from_history(pet_id: int, db: Session = Depends(get_db), current_user
     ).delete()
     db.commit()
     return {"message": "Removed from history"}
+
+# WebSocket endpoint for real-time notifications
+@app.websocket("/ws/{token}")
+async def websocket_endpoint(websocket: WebSocket, token: str):
+    db = SessionLocal()
+    try:
+        # 验证token获取用户
+        user = get_user_from_token(token, db)
+        if not user:
+            await websocket.close(code=4001, reason="Invalid token")
+            return
+
+        await manager.connect(websocket, user.id)
+
+        try:
+            while True:
+                # 接收客户端消息（心跳或其他）
+                data = await websocket.receive_text()
+
+                # 处理心跳
+                if data == "ping":
+                    await websocket.send_text("pong")
+                else:
+                    # 可以处理其他类型的消息
+                    try:
+                        message_data = json.loads(data)
+                        # 处理客户端发送的消息
+                        if message_data.get("type") == "typing":
+                            # 通知对方正在输入
+                            receiver_id = message_data.get("receiver_id")
+                            if receiver_id:
+                                await manager.send_personal_message({
+                                    "type": "typing",
+                                    "data": {
+                                        "sender_id": user.id,
+                                        "sender_name": user.username
+                                    }
+                                }, receiver_id)
+                    except json.JSONDecodeError:
+                        pass
+
+        except WebSocketDisconnect:
+            manager.disconnect(websocket, user.id)
+    finally:
+        db.close()
 
 # Initialize sample data
 def init_sample_data():
