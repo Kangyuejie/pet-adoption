@@ -1,0 +1,23 @@
+# Database
+*.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.so
+.env
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+
+# Claude Code
+.claude/
+
+# Media uploads (if large files)
+media/pets/*
+!media/pets/.gitkeep

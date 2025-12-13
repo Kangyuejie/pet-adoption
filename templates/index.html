@@ -1,0 +1,2201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pet Adoption System</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #FF6B6B;
+            --secondary-color: #4ECDC4;
+            --accent-color: #FFE66D;
+            --dark-color: #2C3E50;
+            --light-color: #F7F9FC;
+        }
+        body {
+            background-color: var(--light-color);
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+        .navbar {
+            background: linear-gradient(135deg, var(--primary-color), #FF8E8E);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .navbar-brand {
+            font-weight: bold;
+            font-size: 1.5rem;
+        }
+        .hero-section {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 80px 0;
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        .hero-section h1 {
+            font-size: 3rem;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        .pet-card {
+            border: none;
+            border-radius: 16px;
+            overflow: hidden;
+            transition: transform 0.3s, box-shadow 0.3s;
+            background: white;
+            height: 100%;
+        }
+        .pet-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+        }
+        .pet-card img {
+            height: 220px;
+            object-fit: cover;
+        }
+        .pet-card .card-body {
+            padding: 20px;
+        }
+        .pet-type-badge {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .badge-dog { background: var(--primary-color); color: white; }
+        .badge-cat { background: var(--secondary-color); color: white; }
+        .badge-other { background: var(--accent-color); color: var(--dark-color); }
+        .match-score {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .btn-primary {
+            background: var(--primary-color);
+            border: none;
+            border-radius: 25px;
+            padding: 10px 30px;
+        }
+        .btn-primary:hover {
+            background: #FF5252;
+        }
+        .btn-secondary {
+            background: var(--secondary-color);
+            border: none;
+            border-radius: 25px;
+        }
+        .btn-outline-light:hover {
+            background: white;
+            color: var(--primary-color);
+        }
+        .filter-section {
+            background: white;
+            padding: 25px;
+            border-radius: 16px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+        }
+        .form-select, .form-control {
+            border-radius: 10px;
+            border: 2px solid #E8E8E8;
+            padding: 10px 15px;
+        }
+        .form-select:focus, .form-control:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.2rem rgba(255,107,107,0.25);
+        }
+        .modal-content {
+            border-radius: 20px;
+            border: none;
+        }
+        .modal-header {
+            border-bottom: none;
+            padding: 25px 25px 0;
+        }
+        .modal-body {
+            padding: 25px;
+        }
+        .stats-card {
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+        }
+        .stats-card h3 {
+            color: var(--primary-color);
+            font-size: 2.5rem;
+            font-weight: bold;
+        }
+        .favorite-btn {
+            position: absolute;
+            bottom: 15px;
+            right: 15px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .favorite-btn:hover {
+            transform: scale(1.1);
+        }
+        .favorite-btn.active i {
+            color: var(--primary-color);
+        }
+        .pet-info-tag {
+            display: inline-block;
+            padding: 4px 12px;
+            background: var(--light-color);
+            border-radius: 15px;
+            font-size: 0.85rem;
+            margin: 2px;
+        }
+        .nav-link {
+            color: rgba(255,255,255,0.9) !important;
+            font-weight: 500;
+        }
+        .nav-link:hover {
+            color: white !important;
+        }
+        .dropdown-menu {
+            border-radius: 12px;
+            border: none;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        .detail-img {
+            width: 100%;
+            max-height: 400px;
+            object-fit: cover;
+            border-radius: 16px;
+        }
+        .placeholder-img {
+            width: 100%;
+            height: 220px;
+            background: linear-gradient(135deg, #f0f0f0, #e0e0e0);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #aaa;
+            font-size: 4rem;
+        }
+        .application-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        .status-badge {
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .status-pending { background: #FFF3CD; color: #856404; }
+        .status-approved { background: #D4EDDA; color: #155724; }
+        .status-rejected { background: #F8D7DA; color: #721C24; }
+        .status-completed { background: #D1ECF1; color: #0C5460; }
+        footer {
+            background: var(--dark-color);
+            color: white;
+            padding: 40px 0;
+            margin-top: 60px;
+        }
+        .lang-switch {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 20px;
+            padding: 5px 15px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+        .lang-switch:hover {
+            background: rgba(255,255,255,0.3);
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- Navbar -->
+        <nav class="navbar navbar-expand-lg navbar-dark">
+            <div class="container">
+                <a class="navbar-brand" href="#" @click.prevent="currentView='home'">
+                    <i class="bi bi-heart-fill"></i> {{ t('siteName') }}
+                </a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav me-auto">
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" @click.prevent="currentView='home'">
+                                <i class="bi bi-house"></i> {{ t('nav.home') }}
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" @click.prevent="currentView='pets'">
+                                <i class="bi bi-search-heart"></i> {{ t('nav.browsePets') }}
+                            </a>
+                        </li>
+                        <li class="nav-item" v-if="user && (user.role === 'shelter' || user.role === 'admin')">
+                            <a class="nav-link" href="#" @click.prevent="currentView='manage'">
+                                <i class="bi bi-clipboard-data"></i> {{ t('nav.manage') }}
+                            </a>
+                        </li>
+                    </ul>
+                    <ul class="navbar-nav align-items-center">
+                        <!-- Language Switch -->
+                        <li class="nav-item me-3">
+                            <button class="lang-switch" @click="toggleLang">
+                                <i class="bi bi-translate"></i> {{ lang === 'zh' ? 'EN' : '中文' }}
+                            </button>
+                        </li>
+                        <li class="nav-item" v-if="!user">
+                            <a class="nav-link" href="#" @click.prevent="showLoginModal=true">
+                                <i class="bi bi-box-arrow-in-right"></i> {{ t('nav.login') }}
+                            </a>
+                        </li>
+                        <li class="nav-item dropdown" v-else>
+                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                                <i class="bi bi-person-circle"></i> {{ user.username }}
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item" href="#" @click.prevent="viewProfile(user.id)">
+                                    <i class="bi bi-person"></i> {{ t('nav.profile') }}
+                                </a></li>
+                                <li><a class="dropdown-item" href="#" @click.prevent="currentView='messages'">
+                                    <i class="bi bi-chat-dots"></i> {{ t('nav.messages') }}
+                                    <span class="badge bg-danger ms-1" v-if="unreadCount > 0">{{ unreadCount }}</span>
+                                </a></li>
+                                <li><a class="dropdown-item" href="#" @click.prevent="currentView='favorites'">
+                                    <i class="bi bi-heart"></i> {{ t('nav.favorites') }}
+                                </a></li>
+                                <li><a class="dropdown-item" href="#" @click.prevent="currentView='history'">
+                                    <i class="bi bi-clock-history"></i> {{ t('nav.history') }}
+                                </a></li>
+                                <li><a class="dropdown-item" href="#" @click.prevent="currentView='applications'">
+                                    <i class="bi bi-file-text"></i> {{ t('nav.applications') }}
+                                </a></li>
+                                <li><a class="dropdown-item" href="#" @click.prevent="currentView='preferences'">
+                                    <i class="bi bi-gear"></i> {{ t('nav.preferences') }}
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="#" @click.prevent="logout">
+                                    <i class="bi bi-box-arrow-right"></i> {{ t('nav.logout') }}
+                                </a></li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Home View -->
+        <div v-if="currentView === 'home'">
+            <section class="hero-section">
+                <div class="container">
+                    <h1><i class="bi bi-heart-fill"></i> {{ t('hero.title') }}</h1>
+                    <p class="lead mb-4">{{ t('hero.subtitle') }}</p>
+                    <button class="btn btn-light btn-lg me-2" @click="currentView='pets'">
+                        <i class="bi bi-search"></i> {{ t('hero.browsePets') }}
+                    </button>
+                    <button class="btn btn-outline-light btn-lg" @click="showRegisterModal=true" v-if="!user">
+                        <i class="bi bi-person-plus"></i> {{ t('hero.signUp') }}
+                    </button>
+                </div>
+            </section>
+
+            <div class="container">
+                <!-- Stats -->
+                <div class="row mb-5">
+                    <div class="col-md-3 mb-3">
+                        <div class="stats-card">
+                            <h3>{{ stats.available_pets || 0 }}</h3>
+                            <p class="mb-0 text-muted">{{ t('stats.availablePets') }}</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="stats-card">
+                            <h3>{{ stats.completed_adoptions || 0 }}</h3>
+                            <p class="mb-0 text-muted">{{ t('stats.happyAdoptions') }}</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="stats-card">
+                            <h3>{{ stats.pets_by_type?.dogs || 0 }}</h3>
+                            <p class="mb-0 text-muted">{{ t('petType.dog') }}</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <div class="stats-card">
+                            <h3>{{ stats.pets_by_type?.cats || 0 }}</h3>
+                            <p class="mb-0 text-muted">{{ t('petType.cat') }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Featured Pets -->
+                <h2 class="mb-4"><i class="bi bi-star-fill text-warning"></i> {{ t('home.featuredPets') }}</h2>
+                <div class="row">
+                    <div class="col-md-4 mb-4" v-for="pet in pets.slice(0, 6)" :key="pet.id">
+                        <div class="pet-card card h-100" @click="showPetDetail(pet)">
+                            <div class="position-relative">
+                                <img :src="pet.image_url || '/static/images/default-pet.png'"
+                                     class="card-img-top"
+                                     :alt="pet.name"
+                                     @error="handleImageError">
+                                <div class="placeholder-img" v-if="!pet.image_url">
+                                    <i class="bi" :class="pet.pet_type === 'dog' ? 'bi-emoji-smile' : 'bi-emoji-heart-eyes'"></i>
+                                </div>
+                                <span class="pet-type-badge" :class="'badge-' + pet.pet_type">
+                                    {{ t('petType.' + pet.pet_type) }}
+                                </span>
+                                <span class="match-score" v-if="user && pet.match_score">
+                                    <i class="bi bi-heart-fill text-danger"></i> {{ pet.match_score }}%
+                                </span>
+                            </div>
+                            <div class="card-body">
+                                <h5 class="card-title fw-bold">{{ pet.name }}</h5>
+                                <p class="text-muted mb-2">
+                                    {{ pet.breed || t('pet.mixed') }} &bull; {{ formatAge(pet.age_months) }}
+                                </p>
+                                <div class="mb-2">
+                                    <span class="pet-info-tag"><i class="bi bi-geo-alt"></i> {{ pet.location || t('pet.unknown') }}</span>
+                                    <span class="pet-info-tag" v-if="pet.is_neutered"><i class="bi bi-check-circle"></i> {{ t('pet.neutered') }}</span>
+                                    <span class="pet-info-tag" v-if="pet.is_vaccinated"><i class="bi bi-shield-check"></i> {{ t('pet.vaccinated') }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-center mt-3">
+                    <button class="btn btn-primary btn-lg" @click="currentView='pets'">
+                        {{ t('home.viewAllPets') }} <i class="bi bi-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pets List View -->
+        <div v-if="currentView === 'pets'" class="container py-5">
+            <h2 class="mb-4"><i class="bi bi-search-heart"></i> {{ t('pets.title') }}</h2>
+
+            <!-- Filters -->
+            <div class="filter-section">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">{{ t('filter.petType') }}</label>
+                        <select class="form-select" v-model="filters.pet_type" @change="loadPets">
+                            <option value="">{{ t('filter.allTypes') }}</option>
+                            <option value="dog">{{ t('petType.dog') }}</option>
+                            <option value="cat">{{ t('petType.cat') }}</option>
+                            <option value="other">{{ t('petType.other') }}</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">{{ t('filter.gender') }}</label>
+                        <select class="form-select" v-model="filters.gender" @change="loadPets">
+                            <option value="">{{ t('filter.all') }}</option>
+                            <option value="male">{{ t('gender.male') }}</option>
+                            <option value="female">{{ t('gender.female') }}</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">{{ t('filter.ageRange') }}</label>
+                        <select class="form-select" v-model="filters.age_range" @change="loadPets">
+                            <option value="">{{ t('filter.anyAge') }}</option>
+                            <option value="0-6">{{ t('age.0-6') }}</option>
+                            <option value="6-24">{{ t('age.6-24') }}</option>
+                            <option value="24-84">{{ t('age.24-84') }}</option>
+                            <option value="84-">{{ t('age.84+') }}</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">{{ t('filter.search') }}</label>
+                        <input type="text" class="form-control" :placeholder="t('filter.searchPlaceholder')"
+                               v-model="filters.search" @input="debounceSearch">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pet Grid -->
+            <div class="row">
+                <div class="col-md-4 mb-4" v-for="pet in pets" :key="pet.id">
+                    <div class="pet-card card h-100">
+                        <div class="position-relative" @click="showPetDetail(pet)" style="cursor:pointer">
+                            <img :src="pet.image_url || '/static/images/default-pet.png'"
+                                 class="card-img-top"
+                                 :alt="pet.name"
+                                 @error="handleImageError">
+                            <div class="placeholder-img" v-if="!pet.image_url">
+                                <i class="bi" :class="pet.pet_type === 'dog' ? 'bi-emoji-smile' : 'bi-emoji-heart-eyes'"></i>
+                            </div>
+                            <span class="pet-type-badge" :class="'badge-' + pet.pet_type">
+                                {{ t('petType.' + pet.pet_type) }}
+                            </span>
+                            <span class="match-score" v-if="user && pet.match_score">
+                                <i class="bi bi-heart-fill text-danger"></i> {{ pet.match_score }}%
+                            </span>
+                        </div>
+                        <div class="card-body" @click="showPetDetail(pet)" style="cursor:pointer">
+                            <h5 class="card-title fw-bold">{{ pet.name }}</h5>
+                            <p class="text-muted mb-2">
+                                {{ pet.breed || t('pet.mixed') }} &bull; {{ formatAge(pet.age_months) }}
+                            </p>
+                            <div class="mb-2">
+                                <span class="pet-info-tag"><i class="bi bi-geo-alt"></i> {{ pet.location || t('pet.unknown') }}</span>
+                                <span class="pet-info-tag" v-if="pet.is_neutered"><i class="bi bi-check-circle"></i> {{ t('pet.neutered') }}</span>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-white border-0 pt-0">
+                            <button class="btn btn-primary w-100" @click="showPetDetail(pet)">
+                                {{ t('pet.viewDetails') }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div v-if="pets.length === 0" class="text-center py-5">
+                <i class="bi bi-emoji-frown display-1 text-muted"></i>
+                <h4 class="mt-3 text-muted">{{ t('pets.noPetsFound') }}</h4>
+                <p class="text-muted">{{ t('pets.adjustFilters') }}</p>
+            </div>
+        </div>
+
+        <!-- Favorites View -->
+        <div v-if="currentView === 'favorites'" class="container py-5">
+            <h2 class="mb-4"><i class="bi bi-heart-fill text-danger"></i> {{ t('favorites.title') }}</h2>
+            <div class="row" v-if="favorites.length > 0">
+                <div class="col-md-4 mb-4" v-for="pet in favorites" :key="pet.id">
+                    <div class="pet-card card h-100" @click="showPetDetail(pet)">
+                        <div class="position-relative">
+                            <img :src="pet.image_url || '/static/images/default-pet.png'"
+                                 class="card-img-top"
+                                 :alt="pet.name">
+                            <span class="pet-type-badge" :class="'badge-' + pet.pet_type">
+                                {{ t('petType.' + pet.pet_type) }}
+                            </span>
+                        </div>
+                        <div class="card-body">
+                            <h5 class="card-title fw-bold">{{ pet.name }}</h5>
+                            <p class="text-muted">{{ pet.breed || t('pet.mixed') }} &bull; {{ formatAge(pet.age_months) }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div v-else class="text-center py-5">
+                <i class="bi bi-heart display-1 text-muted"></i>
+                <h4 class="mt-3 text-muted">{{ t('favorites.noFavorites') }}</h4>
+                <p class="text-muted">{{ t('favorites.startBrowsing') }}</p>
+                <button class="btn btn-primary" @click="currentView='pets'">{{ t('nav.browsePets') }}</button>
+            </div>
+        </div>
+
+        <!-- History View -->
+        <div v-if="currentView === 'history'" class="container py-5">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="bi bi-clock-history text-info"></i> {{ t('history.title') }}</h2>
+                <button class="btn btn-outline-danger btn-sm" @click="clearHistory" v-if="browsingHistory.length > 0">
+                    <i class="bi bi-trash"></i> {{ t('history.clearAll') }}
+                </button>
+            </div>
+            <div class="row" v-if="browsingHistory.length > 0">
+                <div class="col-md-4 mb-4" v-for="pet in browsingHistory" :key="pet.id">
+                    <div class="pet-card card h-100">
+                        <div class="position-relative" @click="showPetDetail(pet)" style="cursor:pointer">
+                            <img :src="pet.image_url || '/static/images/default-pet.png'"
+                                 class="card-img-top"
+                                 :alt="pet.name">
+                            <span class="pet-type-badge" :class="'badge-' + pet.pet_type">
+                                {{ t('petType.' + pet.pet_type) }}
+                            </span>
+                            <span class="match-score" v-if="pet.view_count > 1">
+                                <i class="bi bi-eye"></i> {{ pet.view_count }}
+                            </span>
+                        </div>
+                        <div class="card-body" @click="showPetDetail(pet)" style="cursor:pointer">
+                            <h5 class="card-title fw-bold">{{ pet.name }}</h5>
+                            <p class="text-muted mb-1">{{ pet.breed || t('pet.mixed') }} &bull; {{ formatAge(pet.age_months) }}</p>
+                            <small class="text-muted">
+                                <i class="bi bi-clock"></i> {{ t('history.lastViewed') }}: {{ formatDateTime(pet.last_viewed_at) }}
+                            </small>
+                        </div>
+                        <div class="card-footer bg-white border-0 pt-0">
+                            <div class="d-flex justify-content-between">
+                                <button class="btn btn-outline-primary btn-sm" @click="showPetDetail(pet)">
+                                    <i class="bi bi-eye"></i> {{ t('pet.viewDetails') }}
+                                </button>
+                                <button class="btn btn-outline-danger btn-sm" @click.stop="removeFromHistory(pet.id)">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div v-else class="text-center py-5">
+                <i class="bi bi-clock-history display-1 text-muted"></i>
+                <h4 class="mt-3 text-muted">{{ t('history.noHistory') }}</h4>
+                <p class="text-muted">{{ t('history.startBrowsing') }}</p>
+                <button class="btn btn-primary" @click="currentView='pets'">{{ t('nav.browsePets') }}</button>
+            </div>
+        </div>
+
+        <!-- Applications View -->
+        <div v-if="currentView === 'applications'" class="container py-5">
+            <h2 class="mb-4"><i class="bi bi-file-text"></i> {{ t('applications.title') }}</h2>
+            <div v-if="applications.length > 0">
+                <div class="application-card" v-for="app in applications" :key="app.id">
+                    <div class="row align-items-center">
+                        <div class="col-md-6">
+                            <h5 class="mb-1">{{ app.pet_name }}</h5>
+                            <p class="text-muted mb-0">{{ t('applications.applied') }}: {{ formatDate(app.created_at) }}</p>
+                        </div>
+                        <div class="col-md-3">
+                            <span class="status-badge" :class="'status-' + app.status">
+                                {{ t('status.' + app.status) }}
+                            </span>
+                        </div>
+                        <div class="col-md-3 text-end" v-if="user && user.role !== 'adopter'">
+                            <select class="form-select form-select-sm"
+                                    :value="app.status"
+                                    @change="updateApplicationStatus(app.id, $event.target.value)">
+                                <option value="pending">{{ t('status.pending') }}</option>
+                                <option value="approved">{{ t('status.approved') }}</option>
+                                <option value="rejected">{{ t('status.rejected') }}</option>
+                                <option value="completed">{{ t('status.completed') }}</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-3" v-if="app.reason">
+                        <strong>{{ t('applications.reason') }}:</strong> {{ app.reason }}
+                    </div>
+                </div>
+            </div>
+            <div v-else class="text-center py-5">
+                <i class="bi bi-file-text display-1 text-muted"></i>
+                <h4 class="mt-3 text-muted">{{ t('applications.noApplications') }}</h4>
+                <p class="text-muted">{{ t('applications.startBrowsing') }}</p>
+                <button class="btn btn-primary" @click="currentView='pets'">{{ t('nav.browsePets') }}</button>
+            </div>
+        </div>
+
+        <!-- Preferences View -->
+        <div v-if="currentView === 'preferences'" class="container py-5">
+            <h2 class="mb-4"><i class="bi bi-gear"></i> {{ t('preferences.title') }}</h2>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ t('preferences.matchingPreferences') }}</h5>
+                            <p class="text-muted">{{ t('preferences.setPreferences') }}</p>
+
+                            <div class="mb-3">
+                                <label class="form-label">{{ t('preferences.preferredTypes') }}</label>
+                                <div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="checkbox" value="dog"
+                                               v-model="prefTypes" id="pref-dog">
+                                        <label class="form-check-label" for="pref-dog">{{ t('petType.dog') }}</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="checkbox" value="cat"
+                                               v-model="prefTypes" id="pref-cat">
+                                        <label class="form-check-label" for="pref-cat">{{ t('petType.cat') }}</label>
+                                    </div>
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="checkbox" value="other"
+                                               v-model="prefTypes" id="pref-other">
+                                        <label class="form-check-label" for="pref-other">{{ t('petType.other') }}</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">{{ t('preferences.ageRange') }}</label>
+                                <div class="row">
+                                    <div class="col">
+                                        <input type="number" class="form-control" :placeholder="t('preferences.min')"
+                                               v-model.number="preferences.min_age">
+                                    </div>
+                                    <div class="col">
+                                        <input type="number" class="form-control" :placeholder="t('preferences.max')"
+                                               v-model.number="preferences.max_age">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox"
+                                           v-model="preferences.prefer_neutered" id="pref-neutered">
+                                    <label class="form-check-label" for="pref-neutered">
+                                        {{ t('preferences.preferNeutered') }}
+                                    </label>
+                                </div>
+                            </div>
+
+                            <button class="btn btn-primary" @click="savePreferences">
+                                <i class="bi bi-check"></i> {{ t('preferences.save') }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Manage View (Shelter/Admin) -->
+        <div v-if="currentView === 'manage'" class="container py-5">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="bi bi-clipboard-data"></i> {{ t('manage.title') }}</h2>
+                <button class="btn btn-primary" @click="showAddPetModal=true">
+                    <i class="bi bi-plus-lg"></i> {{ t('manage.addNewPet') }}
+                </button>
+            </div>
+
+            <div class="row">
+                <div class="col-md-4 mb-4" v-for="pet in myPets" :key="pet.id">
+                    <div class="pet-card card h-100">
+                        <div class="position-relative">
+                            <img :src="pet.image_url || '/static/images/default-pet.png'"
+                                 class="card-img-top" :alt="pet.name">
+                            <span class="pet-type-badge" :class="'badge-' + pet.pet_type">
+                                {{ t('petType.' + pet.pet_type) }}
+                            </span>
+                            <span class="badge bg-secondary position-absolute"
+                                  style="top:15px;right:15px" v-if="!pet.is_available">
+                                {{ t('pet.adopted') }}
+                            </span>
+                        </div>
+                        <div class="card-body">
+                            <h5 class="card-title">{{ pet.name }}</h5>
+                            <p class="text-muted">{{ pet.breed }} &bull; {{ formatAge(pet.age_months) }}</p>
+                        </div>
+                        <div class="card-footer bg-white border-0">
+                            <button class="btn btn-outline-danger btn-sm" @click="deletePet(pet.id)">
+                                <i class="bi bi-trash"></i> {{ t('manage.delete') }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Messages View -->
+        <div v-if="currentView === 'messages'" class="container py-5">
+            <h2 class="mb-4"><i class="bi bi-chat-dots"></i> {{ t('messages.title') }}</h2>
+            <div class="row">
+                <!-- Conversation List -->
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">{{ t('messages.conversations') }}</div>
+                        <div class="list-group list-group-flush">
+                            <a href="#" class="list-group-item list-group-item-action"
+                               :class="{active: currentChat && currentChat.partner_id === conv.partner_id}"
+                               v-for="conv in conversations" :key="conv.partner_id"
+                               @click.prevent="openChat(conv.partner_id)">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <i class="bi bi-person-circle me-2"></i>
+                                        <strong>{{ conv.partner_name }}</strong>
+                                    </div>
+                                    <span class="badge bg-danger" v-if="conv.unread_count > 0">{{ conv.unread_count }}</span>
+                                </div>
+                                <small class="text-muted" v-if="conv.messages.length > 0">
+                                    {{ conv.messages[conv.messages.length - 1].content.substring(0, 30) }}...
+                                </small>
+                            </a>
+                            <div class="list-group-item text-center text-muted" v-if="conversations.length === 0">
+                                {{ t('messages.noConversations') }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Chat Window -->
+                <div class="col-md-8">
+                    <div class="card" v-if="currentChat">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-person-circle me-2"></i>{{ currentChat.partner_name }}</span>
+                            <span class="badge bg-info">{{ currentChat.partner_role === 'shelter' ? t('role.shelter') : t('role.adopter') }}</span>
+                        </div>
+                        <div class="card-body chat-messages" style="height: 400px; overflow-y: auto;">
+                            <div v-for="msg in currentChat.messages" :key="msg.id"
+                                 class="mb-3" :class="msg.is_mine ? 'text-end' : ''">
+                                <div class="d-inline-block p-2 rounded"
+                                     :class="msg.is_mine ? 'bg-primary text-white' : 'bg-light'">
+                                    {{ msg.content }}
+                                </div>
+                                <div><small class="text-muted">{{ formatDateTime(msg.created_at) }}</small></div>
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <div class="input-group">
+                                <input type="text" class="form-control" v-model="newMessage"
+                                       :placeholder="t('messages.typePlaceholder')" @keyup.enter="sendMessage">
+                                <button class="btn btn-primary" @click="sendMessage">
+                                    <i class="bi bi-send"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card" v-else>
+                        <div class="card-body text-center py-5">
+                            <i class="bi bi-chat-dots display-1 text-muted"></i>
+                            <p class="mt-3 text-muted">{{ t('messages.selectConversation') }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile View -->
+        <div v-if="currentView === 'profile'" class="container py-5">
+            <div class="row" v-if="profileUser">
+                <div class="col-md-4">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <i class="bi bi-person-circle display-1 text-primary"></i>
+                            <h4 class="mt-3">{{ profileUser.username }}</h4>
+                            <span class="badge" :class="profileUser.role === 'shelter' ? 'bg-success' : 'bg-info'">
+                                {{ profileUser.role === 'shelter' ? t('role.shelter') : profileUser.role === 'admin' ? t('role.admin') : t('role.adopter') }}
+                            </span>
+                            <p class="text-muted mt-2">
+                                <i class="bi bi-calendar"></i> {{ t('profile.joinedAt') }}: {{ formatDate(profileUser.created_at) }}
+                            </p>
+                            <div class="row mt-3">
+                                <div class="col-6">
+                                    <h5>{{ profileUser.pets_count }}</h5>
+                                    <small class="text-muted">{{ t('profile.petsPosted') }}</small>
+                                </div>
+                                <div class="col-6">
+                                    <h5>{{ profileUser.completed_adoptions }}</h5>
+                                    <small class="text-muted">{{ t('profile.adoptions') }}</small>
+                                </div>
+                            </div>
+                            <button class="btn btn-primary mt-3" @click="startChat(profileUser.id)"
+                                    v-if="user && user.id !== profileUser.id">
+                                <i class="bi bi-chat-dots"></i> {{ t('profile.sendMessage') }}
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Edit Profile (only for own profile) -->
+                    <div class="card mt-3" v-if="user && user.id === profileUser.id">
+                        <div class="card-header">{{ t('profile.editProfile') }}</div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">{{ t('profile.phone') }}</label>
+                                <input type="text" class="form-control" v-model="editPhone">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">{{ t('profile.address') }}</label>
+                                <textarea class="form-control" v-model="editAddress" rows="2"></textarea>
+                            </div>
+                            <button class="btn btn-primary w-100" @click="updateProfile">
+                                <i class="bi bi-check"></i> {{ t('profile.save') }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <h4 class="mb-3"><i class="bi bi-heart-fill text-danger"></i> {{ t('profile.postedPets') }}</h4>
+                    <div class="row" v-if="profileUser.pets && profileUser.pets.length > 0">
+                        <div class="col-md-6 mb-3" v-for="pet in profileUser.pets" :key="pet.id">
+                            <div class="pet-card card h-100" @click="showPetDetail(pet)">
+                                <div class="position-relative">
+                                    <div class="placeholder-img" v-if="!pet.image_url">
+                                        <i class="bi" :class="pet.pet_type === 'dog' ? 'bi-emoji-smile' : 'bi-emoji-heart-eyes'"></i>
+                                    </div>
+                                    <span class="pet-type-badge" :class="'badge-' + pet.pet_type">
+                                        {{ t('petType.' + pet.pet_type) }}
+                                    </span>
+                                </div>
+                                <div class="card-body">
+                                    <h5 class="card-title">{{ pet.name }}</h5>
+                                    <p class="text-muted">{{ pet.breed || t('pet.mixed') }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-center py-5" v-else>
+                        <i class="bi bi-inbox display-1 text-muted"></i>
+                        <p class="mt-3 text-muted">{{ t('profile.noPets') }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Login Modal -->
+        <div class="modal fade" :class="{show: showLoginModal}"
+             :style="{display: showLoginModal ? 'block' : 'none'}"
+             tabindex="-1" @click.self="showLoginModal=false">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-box-arrow-in-right"></i> {{ t('auth.login') }}</h5>
+                        <button type="button" class="btn-close" @click="showLoginModal=false"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">{{ t('auth.email') }}</label>
+                            <input type="email" class="form-control" v-model="loginForm.email">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">{{ t('auth.password') }}</label>
+                            <input type="password" class="form-control" v-model="loginForm.password">
+                        </div>
+                        <div class="alert alert-danger" v-if="loginError">{{ loginError }}</div>
+                        <button class="btn btn-primary w-100" @click="login">{{ t('auth.login') }}</button>
+                        <p class="text-center mt-3 mb-0">
+                            {{ t('auth.noAccount') }}
+                            <a href="#" @click.prevent="showLoginModal=false;showRegisterModal=true">{{ t('auth.register') }}</a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop fade show" v-if="showLoginModal"></div>
+
+        <!-- Register Modal -->
+        <div class="modal fade" :class="{show: showRegisterModal}"
+             :style="{display: showRegisterModal ? 'block' : 'none'}"
+             tabindex="-1" @click.self="showRegisterModal=false">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-person-plus"></i> {{ t('auth.register') }}</h5>
+                        <button type="button" class="btn-close" @click="showRegisterModal=false"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">{{ t('auth.username') }}</label>
+                            <input type="text" class="form-control" v-model="registerForm.username">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">{{ t('auth.email') }}</label>
+                            <input type="email" class="form-control" v-model="registerForm.email">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">{{ t('auth.password') }}</label>
+                            <input type="password" class="form-control" v-model="registerForm.password">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">{{ t('auth.role') }}</label>
+                            <select class="form-select" v-model="registerForm.role">
+                                <option value="adopter">{{ t('role.adopter') }}</option>
+                                <option value="shelter">{{ t('role.shelter') }}</option>
+                            </select>
+                        </div>
+                        <div class="alert alert-danger" v-if="registerError">{{ registerError }}</div>
+                        <button class="btn btn-primary w-100" @click="register">{{ t('auth.register') }}</button>
+                        <p class="text-center mt-3 mb-0">
+                            {{ t('auth.hasAccount') }}
+                            <a href="#" @click.prevent="showRegisterModal=false;showLoginModal=true">{{ t('auth.login') }}</a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop fade show" v-if="showRegisterModal"></div>
+
+        <!-- Pet Detail Modal -->
+        <div class="modal fade" :class="{show: showDetailModal}"
+             :style="{display: showDetailModal ? 'block' : 'none'}"
+             tabindex="-1" @click.self="showDetailModal=false">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content" v-if="selectedPet">
+                    <div class="modal-header">
+                        <h5 class="modal-title">{{ selectedPet.name }}</h5>
+                        <button type="button" class="btn-close" @click="showDetailModal=false"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <img :src="selectedPet.image_url || '/static/images/default-pet.png'"
+                                     class="detail-img mb-3" :alt="selectedPet.name">
+                            </div>
+                            <div class="col-md-6">
+                                <h4 class="mb-3">{{ selectedPet.name }}</h4>
+                                <p><strong>{{ t('detail.type') }}:</strong> {{ t('petType.' + selectedPet.pet_type) }}</p>
+                                <p><strong>{{ t('detail.breed') }}:</strong> {{ selectedPet.breed || t('pet.mixed') }}</p>
+                                <p><strong>{{ t('detail.age') }}:</strong> {{ formatAge(selectedPet.age_months) }}</p>
+                                <p><strong>{{ t('detail.gender') }}:</strong> {{ t('gender.' + selectedPet.gender) }}</p>
+                                <p><strong>{{ t('detail.location') }}:</strong> {{ selectedPet.location || t('pet.unknown') }}</p>
+                                <p>
+                                    <span class="badge bg-success me-1" v-if="selectedPet.is_vaccinated">
+                                        <i class="bi bi-shield-check"></i> {{ t('pet.vaccinated') }}
+                                    </span>
+                                    <span class="badge bg-info" v-if="selectedPet.is_neutered">
+                                        <i class="bi bi-check-circle"></i> {{ t('pet.neutered') }}
+                                    </span>
+                                </p>
+                                <hr>
+                                <p>{{ selectedPet.description || t('detail.noDescription') }}</p>
+                                <div v-if="selectedPet.adoption_requirements">
+                                    <strong>{{ t('detail.requirements') }}:</strong>
+                                    <p>{{ selectedPet.adoption_requirements }}</p>
+                                </div>
+                                <!-- Contact Owner -->
+                                <button class="btn btn-outline-primary btn-sm mt-2"
+                                        @click="contactOwner(selectedPet.owner_id)" v-if="user && user.id !== selectedPet.owner_id">
+                                    <i class="bi bi-chat-dots"></i> {{ t('detail.contactOwner') }}
+                                </button>
+                            </div>
+                        </div>
+                        <!-- Comments Section -->
+                        <hr>
+                        <h6><i class="bi bi-chat-left-text"></i> {{ t('comments.title') }} ({{ petComments.length }})</h6>
+                        <div class="comments-section" style="max-height: 200px; overflow-y: auto;">
+                            <div v-for="comment in petComments" :key="comment.id" class="mb-2 p-2 bg-light rounded">
+                                <div class="d-flex justify-content-between">
+                                    <strong class="text-primary" style="cursor:pointer" @click="viewProfile(comment.user_id)">
+                                        {{ comment.username }}
+                                    </strong>
+                                    <small class="text-muted">{{ formatDateTime(comment.created_at) }}</small>
+                                </div>
+                                <p class="mb-0 mt-1">{{ comment.content }}</p>
+                            </div>
+                            <p class="text-muted text-center" v-if="petComments.length === 0">{{ t('comments.noComments') }}</p>
+                        </div>
+                        <div class="mt-2" v-if="user">
+                            <div class="input-group">
+                                <input type="text" class="form-control" v-model="newComment"
+                                       :placeholder="t('comments.placeholder')" @keyup.enter="addComment">
+                                <button class="btn btn-primary" @click="addComment">
+                                    <i class="bi bi-send"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-outline-danger" @click="toggleFavorite(selectedPet.id)" v-if="user">
+                            <i class="bi" :class="isFavorite(selectedPet.id) ? 'bi-heart-fill' : 'bi-heart'"></i>
+                            {{ isFavorite(selectedPet.id) ? t('detail.removeFromFavorites') : t('detail.addToFavorites') }}
+                        </button>
+                        <button class="btn btn-primary" @click="showApplicationForm=true" v-if="user && selectedPet.is_available">
+                            <i class="bi bi-send"></i> {{ t('detail.applyToAdopt') }}
+                        </button>
+                        <button class="btn btn-secondary" @click="showLoginModal=true" v-if="!user">
+                            {{ t('detail.loginToApply') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop fade show" v-if="showDetailModal"></div>
+
+        <!-- Application Form Modal -->
+        <div class="modal fade" :class="{show: showApplicationForm}"
+             :style="{display: showApplicationForm ? 'block' : 'none'}"
+             tabindex="-1" @click.self="showApplicationForm=false">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-file-text"></i> {{ t('application.title') }}</h5>
+                        <button type="button" class="btn-close" @click="showApplicationForm=false"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">{{ t('application.homeType') }}</label>
+                            <select class="form-select" v-model="applicationForm.home_type">
+                                <option value="">{{ t('application.select') }}</option>
+                                <option value="house">{{ t('homeType.house') }}</option>
+                                <option value="apartment">{{ t('homeType.apartment') }}</option>
+                                <option value="condo">{{ t('homeType.condo') }}</option>
+                                <option value="other">{{ t('homeType.other') }}</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" v-model="applicationForm.has_yard" id="has-yard">
+                                <label class="form-check-label" for="has-yard">{{ t('application.hasYard') }}</label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">{{ t('application.otherPets') }}</label>
+                            <input type="text" class="form-control" v-model="applicationForm.other_pets"
+                                   :placeholder="t('application.otherPetsPlaceholder')">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">{{ t('application.experience') }}</label>
+                            <textarea class="form-control" v-model="applicationForm.experience" rows="2"
+                                      :placeholder="t('application.experiencePlaceholder')"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">{{ t('application.reason') }}</label>
+                            <textarea class="form-control" v-model="applicationForm.reason" rows="3"></textarea>
+                        </div>
+                        <div class="alert alert-danger" v-if="applicationError">{{ applicationError }}</div>
+                        <button class="btn btn-primary w-100" @click="submitApplication">
+                            <i class="bi bi-send"></i> {{ t('application.submit') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop fade show" v-if="showApplicationForm"></div>
+
+        <!-- Add Pet Modal -->
+        <div class="modal fade" :class="{show: showAddPetModal}"
+             :style="{display: showAddPetModal ? 'block' : 'none'}"
+             tabindex="-1" @click.self="showAddPetModal=false">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-plus-lg"></i> {{ t('addPet.title') }}</h5>
+                        <button type="button" class="btn-close" @click="showAddPetModal=false"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form @submit.prevent="addPet" enctype="multipart/form-data">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">{{ t('addPet.name') }} *</label>
+                                    <input type="text" class="form-control" v-model="newPet.name" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">{{ t('addPet.petType') }} *</label>
+                                    <select class="form-select" v-model="newPet.pet_type" required>
+                                        <option value="dog">{{ t('petType.dog') }}</option>
+                                        <option value="cat">{{ t('petType.cat') }}</option>
+                                        <option value="other">{{ t('petType.other') }}</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">{{ t('addPet.breed') }}</label>
+                                    <input type="text" class="form-control" v-model="newPet.breed"
+                                           :list="'breed-list-' + newPet.pet_type"
+                                           :placeholder="t('addPet.breedPlaceholder')">
+                                    <datalist id="breed-list-dog">
+                                        <option value="金毛寻回犬">
+                                        <option value="拉布拉多">
+                                        <option value="中华田园犬">
+                                        <option value="泰迪犬">
+                                        <option value="柯基犬">
+                                        <option value="哈士奇">
+                                        <option value="萨摩耶">
+                                        <option value="边境牧羊犬">
+                                        <option value="德国牧羊犬">
+                                        <option value="比熊犬">
+                                        <option value="博美犬">
+                                        <option value="柴犬">
+                                        <option value="阿拉斯加">
+                                        <option value="法国斗牛犬">
+                                        <option value="吉娃娃">
+                                        <option value="雪纳瑞">
+                                        <option value="贵宾犬">
+                                        <option value="巴哥犬">
+                                        <option value="秋田犬">
+                                        <option value="松狮犬">
+                                    </datalist>
+                                    <datalist id="breed-list-cat">
+                                        <option value="英国短毛猫">
+                                        <option value="美国短毛猫">
+                                        <option value="布偶猫">
+                                        <option value="橘猫">
+                                        <option value="狸花猫">
+                                        <option value="三花猫">
+                                        <option value="暹罗猫">
+                                        <option value="波斯猫">
+                                        <option value="缅因猫">
+                                        <option value="苏格兰折耳猫">
+                                        <option value="俄罗斯蓝猫">
+                                        <option value="孟买猫">
+                                        <option value="金吉拉">
+                                        <option value="无毛猫">
+                                        <option value="奶牛猫">
+                                        <option value="玳瑁猫">
+                                        <option value="加菲猫">
+                                        <option value="曼基康猫">
+                                    </datalist>
+                                    <datalist id="breed-list-other">
+                                        <option value="垂耳兔">
+                                        <option value="荷兰猪">
+                                        <option value="仓鼠">
+                                        <option value="龙猫">
+                                        <option value="金丝熊">
+                                        <option value="乌龟">
+                                        <option value="鹦鹉">
+                                        <option value="八哥">
+                                        <option value="金鱼">
+                                        <option value="刺猬">
+                                        <option value="蜥蜴">
+                                        <option value="蛇">
+                                    </datalist>
+                                    <small class="text-muted">{{ t('addPet.breedHint') }}</small>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label class="form-label">{{ t('addPet.age') }} *</label>
+                                    <input type="number" class="form-control" v-model.number="newPet.age_months" required>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label class="form-label">{{ t('addPet.gender') }} *</label>
+                                    <select class="form-select" v-model="newPet.gender" required>
+                                        <option value="male">{{ t('gender.male') }}</option>
+                                        <option value="female">{{ t('gender.female') }}</option>
+                                        <option value="unknown">{{ t('gender.unknown') }}</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">{{ t('addPet.description') }}</label>
+                                <textarea class="form-control" v-model="newPet.description" rows="3"></textarea>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">{{ t('addPet.location') }}</label>
+                                    <input type="text" class="form-control" v-model="newPet.location">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">{{ t('addPet.photo') }}</label>
+                                    <input type="file" class="form-control" @change="handleFileSelect" accept="image/*">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" v-model="newPet.is_neutered" id="neutered">
+                                    <label class="form-check-label" for="neutered">{{ t('pet.neutered') }}</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" v-model="newPet.is_vaccinated" id="vaccinated">
+                                    <label class="form-check-label" for="vaccinated">{{ t('pet.vaccinated') }}</label>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">{{ t('addPet.requirements') }}</label>
+                                <textarea class="form-control" v-model="newPet.adoption_requirements" rows="2"></textarea>
+                            </div>
+                            <div class="alert alert-danger" v-if="addPetError">{{ addPetError }}</div>
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-plus-lg"></i> {{ t('addPet.submit') }}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop fade show" v-if="showAddPetModal"></div>
+
+        <!-- Footer -->
+        <footer>
+            <div class="container">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5><i class="bi bi-heart-fill"></i> {{ t('siteName') }}</h5>
+                        <p class="text-light opacity-75">{{ t('footer.slogan') }}</p>
+                    </div>
+                    <div class="col-md-6 text-md-end">
+                        <p class="mb-0 text-light opacity-75">&copy; 2024 {{ t('siteName') }}. {{ t('footer.rights') }}</p>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const { createApp, ref, computed, onMounted, watch } = Vue;
+
+        // i18n translations
+        const translations = {
+            en: {
+                siteName: 'Pet Adoption',
+                nav: {
+                    home: 'Home',
+                    browsePets: 'Browse Pets',
+                    manage: 'Manage',
+                    login: 'Login',
+                    profile: 'My Profile',
+                    messages: 'Messages',
+                    favorites: 'My Favorites',
+                    history: 'History',
+                    applications: 'Applications',
+                    preferences: 'Preferences',
+                    logout: 'Logout'
+                },
+                hero: {
+                    title: 'Find Your Perfect Companion',
+                    subtitle: 'Give a loving home to pets in need. Browse our available pets and start your adoption journey today.',
+                    browsePets: 'Browse Pets',
+                    signUp: 'Sign Up'
+                },
+                stats: {
+                    availablePets: 'Available Pets',
+                    happyAdoptions: 'Happy Adoptions'
+                },
+                home: {
+                    featuredPets: 'Featured Pets',
+                    viewAllPets: 'View All Pets'
+                },
+                pets: {
+                    title: 'Find Your Perfect Pet',
+                    noPetsFound: 'No pets found',
+                    adjustFilters: 'Try adjusting your filters'
+                },
+                petType: {
+                    dog: 'Dog',
+                    cat: 'Cat',
+                    other: 'Other'
+                },
+                gender: {
+                    male: 'Male',
+                    female: 'Female',
+                    unknown: 'Unknown'
+                },
+                pet: {
+                    mixed: 'Mixed',
+                    unknown: 'Unknown',
+                    neutered: 'Neutered',
+                    vaccinated: 'Vaccinated',
+                    viewDetails: 'View Details',
+                    adopted: 'Adopted'
+                },
+                filter: {
+                    petType: 'Pet Type',
+                    allTypes: 'All Types',
+                    gender: 'Gender',
+                    all: 'All',
+                    ageRange: 'Age Range',
+                    anyAge: 'Any Age',
+                    search: 'Search',
+                    searchPlaceholder: 'Name or breed...'
+                },
+                age: {
+                    '0-6': '0-6 months',
+                    '6-24': '6-24 months',
+                    '24-84': '2-7 years',
+                    '84+': '7+ years',
+                    months: 'months',
+                    year: 'year',
+                    years: 'years'
+                },
+                favorites: {
+                    title: 'My Favorites',
+                    noFavorites: 'No favorites yet',
+                    startBrowsing: 'Start browsing pets and add them to your favorites!'
+                },
+                history: {
+                    title: 'Browsing History',
+                    noHistory: 'No browsing history',
+                    startBrowsing: 'Start browsing pets to see your history here!',
+                    lastViewed: 'Last viewed',
+                    clearAll: 'Clear All',
+                    viewCount: 'views'
+                },
+                applications: {
+                    title: 'My Applications',
+                    applied: 'Applied',
+                    reason: 'Reason',
+                    noApplications: 'No applications yet',
+                    startBrowsing: 'Browse pets and submit an adoption application!'
+                },
+                status: {
+                    pending: 'Pending',
+                    approved: 'Approved',
+                    rejected: 'Rejected',
+                    completed: 'Completed'
+                },
+                preferences: {
+                    title: 'My Preferences',
+                    matchingPreferences: 'Matching Preferences',
+                    setPreferences: 'Set your preferences to get better pet recommendations.',
+                    preferredTypes: 'Preferred Pet Types',
+                    ageRange: 'Age Range (months)',
+                    min: 'Min',
+                    max: 'Max',
+                    preferNeutered: 'Prefer neutered pets',
+                    save: 'Save Preferences'
+                },
+                manage: {
+                    title: 'Manage Pets',
+                    addNewPet: 'Add New Pet',
+                    delete: 'Delete'
+                },
+                auth: {
+                    login: 'Login',
+                    register: 'Register',
+                    email: 'Email',
+                    password: 'Password',
+                    username: 'Username',
+                    role: 'Role',
+                    noAccount: "Don't have an account?",
+                    hasAccount: 'Already have an account?'
+                },
+                role: {
+                    adopter: 'Adopter',
+                    shelter: 'Shelter/Rescue'
+                },
+                detail: {
+                    type: 'Type',
+                    breed: 'Breed',
+                    age: 'Age',
+                    gender: 'Gender',
+                    location: 'Location',
+                    noDescription: 'No description available.',
+                    requirements: 'Adoption Requirements',
+                    addToFavorites: 'Add to Favorites',
+                    removeFromFavorites: 'Remove from Favorites',
+                    applyToAdopt: 'Apply to Adopt',
+                    loginToApply: 'Login to Apply'
+                },
+                application: {
+                    title: 'Adoption Application',
+                    homeType: 'Home Type',
+                    select: 'Select...',
+                    hasYard: 'I have a yard/outdoor space',
+                    otherPets: 'Other Pets',
+                    otherPetsPlaceholder: 'Describe any other pets you have',
+                    experience: 'Pet Experience',
+                    experiencePlaceholder: 'Describe your experience with pets',
+                    reason: 'Why do you want to adopt this pet?',
+                    submit: 'Submit Application'
+                },
+                homeType: {
+                    house: 'House',
+                    apartment: 'Apartment',
+                    condo: 'Condo',
+                    other: 'Other'
+                },
+                addPet: {
+                    title: 'Add New Pet',
+                    name: 'Name',
+                    petType: 'Pet Type',
+                    breed: 'Breed',
+                    breedPlaceholder: 'Select or enter breed',
+                    breedHint: 'You can select from the list or enter a custom breed',
+                    age: 'Age (months)',
+                    gender: 'Gender',
+                    description: 'Description',
+                    location: 'Location',
+                    photo: 'Photo',
+                    requirements: 'Adoption Requirements',
+                    submit: 'Add Pet'
+                },
+                footer: {
+                    slogan: 'Connecting loving homes with pets in need.',
+                    rights: 'All rights reserved.'
+                },
+                messages: {
+                    applicationSubmitted: 'Application submitted successfully!',
+                    preferencesSaved: 'Preferences saved!',
+                    petAdded: 'Pet added successfully!',
+                    confirmDelete: 'Are you sure you want to delete this pet?',
+                    title: 'Messages',
+                    conversations: 'Conversations',
+                    noConversations: 'No conversations yet',
+                    selectConversation: 'Select a conversation to start chatting',
+                    typePlaceholder: 'Type a message...'
+                },
+                profile: {
+                    joinedAt: 'Joined',
+                    petsPosted: 'Pets Posted',
+                    adoptions: 'Adoptions',
+                    sendMessage: 'Send Message',
+                    editProfile: 'Edit Profile',
+                    phone: 'Phone',
+                    address: 'Address',
+                    save: 'Save',
+                    postedPets: 'Posted Pets',
+                    noPets: 'No pets posted yet'
+                },
+                comments: {
+                    title: 'Comments',
+                    noComments: 'No comments yet',
+                    placeholder: 'Write a comment...'
+                },
+                detail: {
+                    type: 'Type',
+                    breed: 'Breed',
+                    age: 'Age',
+                    gender: 'Gender',
+                    location: 'Location',
+                    noDescription: 'No description available.',
+                    requirements: 'Adoption Requirements',
+                    addToFavorites: 'Add to Favorites',
+                    removeFromFavorites: 'Remove from Favorites',
+                    applyToAdopt: 'Apply to Adopt',
+                    loginToApply: 'Login to Apply',
+                    contactOwner: 'Contact Owner'
+                },
+                role: {
+                    adopter: 'Adopter',
+                    shelter: 'Shelter/Rescue',
+                    admin: 'Admin'
+                }
+            },
+            zh: {
+                siteName: '宠物领养',
+                nav: {
+                    home: '首页',
+                    browsePets: '浏览宠物',
+                    manage: '管理',
+                    login: '登录',
+                    profile: '个人主页',
+                    messages: '消息',
+                    favorites: '我的收藏',
+                    history: '浏览历史',
+                    applications: '申请记录',
+                    preferences: '偏好设置',
+                    logout: '退出'
+                },
+                hero: {
+                    title: '寻找您的完美伴侣',
+                    subtitle: '给需要家的宠物一个温暖的归宿。浏览可领养的宠物，开始您的领养之旅。',
+                    browsePets: '浏览宠物',
+                    signUp: '立即注册'
+                },
+                stats: {
+                    availablePets: '可领养宠物',
+                    happyAdoptions: '成功领养'
+                },
+                home: {
+                    featuredPets: '精选宠物',
+                    viewAllPets: '查看全部'
+                },
+                pets: {
+                    title: '寻找您的完美宠物',
+                    noPetsFound: '未找到宠物',
+                    adjustFilters: '请尝试调整筛选条件'
+                },
+                petType: {
+                    dog: '狗',
+                    cat: '猫',
+                    other: '其他'
+                },
+                gender: {
+                    male: '公',
+                    female: '母',
+                    unknown: '未知'
+                },
+                pet: {
+                    mixed: '混血',
+                    unknown: '未知',
+                    neutered: '已绝育',
+                    vaccinated: '已接种',
+                    viewDetails: '查看详情',
+                    adopted: '已领养'
+                },
+                filter: {
+                    petType: '宠物类型',
+                    allTypes: '全部类型',
+                    gender: '性别',
+                    all: '全部',
+                    ageRange: '年龄范围',
+                    anyAge: '不限年龄',
+                    search: '搜索',
+                    searchPlaceholder: '名字或品种...'
+                },
+                age: {
+                    '0-6': '0-6个月',
+                    '6-24': '6-24个月',
+                    '24-84': '2-7岁',
+                    '84+': '7岁以上',
+                    months: '个月',
+                    year: '岁',
+                    years: '岁'
+                },
+                favorites: {
+                    title: '我的收藏',
+                    noFavorites: '暂无收藏',
+                    startBrowsing: '开始浏览宠物并添加到收藏夹吧！'
+                },
+                history: {
+                    title: '浏览历史',
+                    noHistory: '暂无浏览记录',
+                    startBrowsing: '开始浏览宠物，这里会记录您的足迹！',
+                    lastViewed: '最后浏览',
+                    clearAll: '清空记录',
+                    viewCount: '次浏览'
+                },
+                applications: {
+                    title: '我的申请',
+                    applied: '申请时间',
+                    reason: '申请理由',
+                    noApplications: '暂无申请记录',
+                    startBrowsing: '浏览宠物并提交领养申请吧！'
+                },
+                status: {
+                    pending: '待审核',
+                    approved: '已通过',
+                    rejected: '已拒绝',
+                    completed: '已完成'
+                },
+                preferences: {
+                    title: '我的偏好',
+                    matchingPreferences: '匹配偏好',
+                    setPreferences: '设置您的偏好以获得更好的宠物推荐。',
+                    preferredTypes: '偏好的宠物类型',
+                    ageRange: '年龄范围（月）',
+                    min: '最小',
+                    max: '最大',
+                    preferNeutered: '偏好已绝育的宠物',
+                    save: '保存偏好'
+                },
+                manage: {
+                    title: '管理宠物',
+                    addNewPet: '添加新宠物',
+                    delete: '删除'
+                },
+                auth: {
+                    login: '登录',
+                    register: '注册',
+                    email: '邮箱',
+                    password: '密码',
+                    username: '用户名',
+                    role: '角色',
+                    noAccount: '还没有账号？',
+                    hasAccount: '已有账号？'
+                },
+                role: {
+                    adopter: '领养者',
+                    shelter: '救助机构'
+                },
+                detail: {
+                    type: '类型',
+                    breed: '品种',
+                    age: '年龄',
+                    gender: '性别',
+                    location: '位置',
+                    noDescription: '暂无描述。',
+                    requirements: '领养要求',
+                    addToFavorites: '添加收藏',
+                    removeFromFavorites: '取消收藏',
+                    applyToAdopt: '申请领养',
+                    loginToApply: '登录后申请'
+                },
+                application: {
+                    title: '领养申请',
+                    homeType: '住房类型',
+                    select: '请选择...',
+                    hasYard: '我有院子/户外空间',
+                    otherPets: '其他宠物',
+                    otherPetsPlaceholder: '描述您养的其他宠物',
+                    experience: '养宠经验',
+                    experiencePlaceholder: '描述您的养宠经验',
+                    reason: '您为什么想领养这只宠物？',
+                    submit: '提交申请'
+                },
+                homeType: {
+                    house: '独立住宅',
+                    apartment: '公寓',
+                    condo: '联排别墅',
+                    other: '其他'
+                },
+                addPet: {
+                    title: '添加新宠物',
+                    name: '名字',
+                    petType: '宠物类型',
+                    breed: '品种',
+                    breedPlaceholder: '选择或输入品种',
+                    breedHint: '可从列表中选择，也可自行输入品种',
+                    age: '年龄（月）',
+                    gender: '性别',
+                    description: '描述',
+                    location: '位置',
+                    photo: '照片',
+                    requirements: '领养要求',
+                    submit: '添加宠物'
+                },
+                footer: {
+                    slogan: '为需要家的宠物连接爱的归宿。',
+                    rights: '保留所有权利。'
+                },
+                messages: {
+                    applicationSubmitted: '申请提交成功！',
+                    preferencesSaved: '偏好已保存！',
+                    petAdded: '宠物添加成功！',
+                    confirmDelete: '确定要删除这只宠物吗？',
+                    title: '消息',
+                    conversations: '会话列表',
+                    noConversations: '暂无会话',
+                    selectConversation: '选择一个会话开始聊天',
+                    typePlaceholder: '输入消息...'
+                },
+                profile: {
+                    joinedAt: '注册时间',
+                    petsPosted: '发布宠物',
+                    adoptions: '领养数',
+                    sendMessage: '发送消息',
+                    editProfile: '编辑资料',
+                    phone: '电话',
+                    address: '地址',
+                    save: '保存',
+                    postedPets: '发布的宠物',
+                    noPets: '暂无发布的宠物'
+                },
+                comments: {
+                    title: '评论',
+                    noComments: '暂无评论',
+                    placeholder: '写下你的评论...'
+                },
+                detail: {
+                    type: '类型',
+                    breed: '品种',
+                    age: '年龄',
+                    gender: '性别',
+                    location: '位置',
+                    noDescription: '暂无描述。',
+                    requirements: '领养要求',
+                    addToFavorites: '添加收藏',
+                    removeFromFavorites: '取消收藏',
+                    applyToAdopt: '申请领养',
+                    loginToApply: '登录后申请',
+                    contactOwner: '联系发布者'
+                },
+                role: {
+                    adopter: '领养者',
+                    shelter: '救助机构',
+                    admin: '管理员'
+                }
+            }
+        };
+
+        createApp({
+            setup() {
+                // Language
+                const lang = ref(localStorage.getItem('lang') || 'zh');
+
+                const t = (key) => {
+                    const keys = key.split('.');
+                    let value = translations[lang.value];
+                    for (const k of keys) {
+                        value = value?.[k];
+                    }
+                    return value || key;
+                };
+
+                const toggleLang = () => {
+                    lang.value = lang.value === 'zh' ? 'en' : 'zh';
+                    localStorage.setItem('lang', lang.value);
+                    document.documentElement.lang = lang.value === 'zh' ? 'zh-CN' : 'en';
+                };
+
+                // State
+                const currentView = ref('home');
+                const user = ref(null);
+                const pets = ref([]);
+                const myPets = ref([]);
+                const favorites = ref([]);
+                const applications = ref([]);
+                const stats = ref({});
+                const selectedPet = ref(null);
+                const preferences = ref({});
+                const prefTypes = ref([]);
+                const conversations = ref([]);
+                const currentChat = ref(null);
+                const newMessage = ref('');
+                const profileUser = ref(null);
+                const petComments = ref([]);
+                const newComment = ref('');
+                const unreadCount = ref(0);
+                const editPhone = ref('');
+                const editAddress = ref('');
+                const browsingHistory = ref([]);
+
+                // Modals
+                const showLoginModal = ref(false);
+                const showRegisterModal = ref(false);
+                const showDetailModal = ref(false);
+                const showApplicationForm = ref(false);
+                const showAddPetModal = ref(false);
+
+                // Forms
+                const loginForm = ref({ email: '', password: '' });
+                const registerForm = ref({ username: '', email: '', password: '', role: 'adopter' });
+                const applicationForm = ref({ home_type: '', has_yard: false, other_pets: '', experience: '', reason: '' });
+                const newPet = ref({
+                    name: '', pet_type: 'dog', breed: '', age_months: 12, gender: 'male',
+                    description: '', is_neutered: false, is_vaccinated: false, location: '', adoption_requirements: ''
+                });
+                const selectedFile = ref(null);
+
+                // Errors
+                const loginError = ref('');
+                const registerError = ref('');
+                const applicationError = ref('');
+                const addPetError = ref('');
+
+                // Filters
+                const filters = ref({ pet_type: '', gender: '', age_range: '', search: '' });
+                let searchTimeout = null;
+
+                // API helper
+                const api = async (url, options = {}) => {
+                    const token = localStorage.getItem('token');
+                    const headers = { ...options.headers };
+                    if (token) headers['Authorization'] = `Bearer ${token}`;
+                    if (!(options.body instanceof FormData)) {
+                        headers['Content-Type'] = 'application/json';
+                    }
+                    const response = await fetch(url, { ...options, headers });
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.detail || 'Request failed');
+                    }
+                    return response.json();
+                };
+
+                // Auth
+                const login = async () => {
+                    try {
+                        loginError.value = '';
+                        const data = await api('/api/login', {
+                            method: 'POST',
+                            body: JSON.stringify(loginForm.value)
+                        });
+                        localStorage.setItem('token', data.access_token);
+                        user.value = data.user;
+                        showLoginModal.value = false;
+                        loadPets();
+                        loadFavorites();
+                        loadApplications();
+                        loadPreferences();
+                        loadUnreadCount();
+                    } catch (e) {
+                        loginError.value = e.message;
+                    }
+                };
+
+                const register = async () => {
+                    try {
+                        registerError.value = '';
+                        const data = await api('/api/register', {
+                            method: 'POST',
+                            body: JSON.stringify(registerForm.value)
+                        });
+                        localStorage.setItem('token', data.access_token);
+                        user.value = data.user;
+                        showRegisterModal.value = false;
+                        loadPets();
+                    } catch (e) {
+                        registerError.value = e.message;
+                    }
+                };
+
+                const logout = () => {
+                    localStorage.removeItem('token');
+                    user.value = null;
+                    favorites.value = [];
+                    applications.value = [];
+                    currentView.value = 'home';
+                };
+
+                const checkAuth = async () => {
+                    const token = localStorage.getItem('token');
+                    if (token) {
+                        try {
+                            user.value = await api('/api/me');
+                            loadFavorites();
+                            loadApplications();
+                            loadPreferences();
+                            loadMyPets();
+                            loadUnreadCount();
+                        } catch (e) {
+                            localStorage.removeItem('token');
+                        }
+                    }
+                };
+
+                // Data loading
+                const loadPets = async () => {
+                    try {
+                        let url = '/api/pets?';
+                        if (filters.value.pet_type) url += `pet_type=${filters.value.pet_type}&`;
+                        if (filters.value.gender) url += `gender=${filters.value.gender}&`;
+                        if (filters.value.search) url += `search=${filters.value.search}&`;
+                        if (filters.value.age_range) {
+                            const [min, max] = filters.value.age_range.split('-');
+                            if (min) url += `min_age=${min}&`;
+                            if (max) url += `max_age=${max}&`;
+                        }
+                        pets.value = await api(url);
+                    } catch (e) {
+                        console.error(e);
+                    }
+                };
+
+                const loadStats = async () => {
+                    try {
+                        stats.value = await api('/api/stats');
+                    } catch (e) {
+                        console.error(e);
+                    }
+                };
+
+                const loadFavorites = async () => {
+                    if (!user.value) return;
+                    try {
+                        favorites.value = await api('/api/favorites');
+                    } catch (e) {
+                        console.error(e);
+                    }
+                };
+
+                const loadApplications = async () => {
+                    if (!user.value) return;
+                    try {
+                        applications.value = await api('/api/applications');
+                    } catch (e) {
+                        console.error(e);
+                    }
+                };
+
+                const loadPreferences = async () => {
+                    if (!user.value) return;
+                    try {
+                        const prefs = await api('/api/preferences');
+                        preferences.value = prefs;
+                        if (prefs.preferred_types) {
+                            prefTypes.value = prefs.preferred_types.split(',');
+                        }
+                    } catch (e) {
+                        console.error(e);
+                    }
+                };
+
+                const loadMyPets = async () => {
+                    if (!user.value) return;
+                    try {
+                        myPets.value = await api('/api/my-pets');
+                    } catch (e) {
+                        console.error(e);
+                    }
+                };
+
+                // Actions
+                const showPetDetail = (pet) => {
+                    selectedPet.value = pet;
+                    showDetailModal.value = true;
+                    recordView(pet.id);
+                };
+
+                const toggleFavorite = async (petId) => {
+                    try {
+                        await api(`/api/favorites/${petId}`, { method: 'POST' });
+                        loadFavorites();
+                    } catch (e) {
+                        console.error(e);
+                    }
+                };
+
+                const isFavorite = (petId) => {
+                    return favorites.value.some(f => f.id === petId);
+                };
+
+                const submitApplication = async () => {
+                    try {
+                        applicationError.value = '';
+                        await api('/api/applications', {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                pet_id: selectedPet.value.id,
+                                ...applicationForm.value
+                            })
+                        });
+                        showApplicationForm.value = false;
+                        showDetailModal.value = false;
+                        applicationForm.value = { home_type: '', has_yard: false, other_pets: '', experience: '', reason: '' };
+                        loadApplications();
+                        alert(t('messages.applicationSubmitted'));
+                    } catch (e) {
+                        applicationError.value = e.message;
+                    }
+                };
+
+                const updateApplicationStatus = async (appId, status) => {
+                    try {
+                        await api(`/api/applications/${appId}/status?status=${status}`, { method: 'PUT' });
+                        loadApplications();
+                        loadPets();
+                    } catch (e) {
+                        console.error(e);
+                    }
+                };
+
+                const savePreferences = async () => {
+                    try {
+                        await api('/api/preferences', {
+                            method: 'PUT',
+                            body: JSON.stringify({
+                                ...preferences.value,
+                                preferred_types: prefTypes.value.join(',')
+                            })
+                        });
+                        loadPets();
+                        alert(t('messages.preferencesSaved'));
+                    } catch (e) {
+                        console.error(e);
+                    }
+                };
+
+                const handleFileSelect = (e) => {
+                    selectedFile.value = e.target.files[0];
+                };
+
+                const addPet = async () => {
+                    try {
+                        addPetError.value = '';
+                        const formData = new FormData();
+                        Object.keys(newPet.value).forEach(key => {
+                            formData.append(key, newPet.value[key]);
+                        });
+                        if (selectedFile.value) {
+                            formData.append('image', selectedFile.value);
+                        }
+                        await api('/api/pets', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        showAddPetModal.value = false;
+                        newPet.value = {
+                            name: '', pet_type: 'dog', breed: '', age_months: 12, gender: 'male',
+                            description: '', is_neutered: false, is_vaccinated: false, location: '', adoption_requirements: ''
+                        };
+                        selectedFile.value = null;
+                        loadPets();
+                        loadMyPets();
+                        alert(t('messages.petAdded'));
+                    } catch (e) {
+                        addPetError.value = e.message;
+                    }
+                };
+
+                const deletePet = async (petId) => {
+                    if (!confirm(t('messages.confirmDelete'))) return;
+                    try {
+                        await api(`/api/pets/${petId}`, { method: 'DELETE' });
+                        loadPets();
+                        loadMyPets();
+                    } catch (e) {
+                        console.error(e);
+                    }
+                };
+
+                const debounceSearch = () => {
+                    clearTimeout(searchTimeout);
+                    searchTimeout = setTimeout(loadPets, 300);
+                };
+
+                // Message functions
+                const loadMessages = async () => {
+                    if (!user.value) return;
+                    try {
+                        conversations.value = await api('/api/messages');
+                    } catch (e) {
+                        console.error(e);
+                    }
+                };
+
+                const loadUnreadCount = async () => {
+                    if (!user.value) return;
+                    try {
+                        const data = await api('/api/messages/unread/count');
+                        unreadCount.value = data.unread_count;
+                    } catch (e) {
+                        console.error(e);
+                    }
+                };
+
+                const openChat = async (partnerId) => {
+                    try {
+                        currentChat.value = await api(`/api/messages/${partnerId}`);
+                        loadUnreadCount();
+                    } catch (e) {
+                        console.error(e);
+                    }
+                };
+
+                const sendMessage = async () => {
+                    if (!newMessage.value.trim() || !currentChat.value) return;
+                    try {
+                        await api(`/api/messages?receiver_id=${currentChat.value.partner_id}&content=${encodeURIComponent(newMessage.value)}`, {
+                            method: 'POST'
+                        });
+                        newMessage.value = '';
+                        openChat(currentChat.value.partner_id);
+                        loadMessages();
+                    } catch (e) {
+                        console.error(e);
+                    }
+                };
+
+                const startChat = (userId) => {
+                    currentView.value = 'messages';
+                    openChat(userId);
+                };
+
+                const contactOwner = (ownerId) => {
+                    showDetailModal.value = false;
+                    startChat(ownerId);
+                };
+
+                // Profile functions
+                const viewProfile = async (userId) => {
+                    try {
+                        profileUser.value = await api(`/api/users/${userId}`);
+                        editPhone.value = user.value?.phone || '';
+                        editAddress.value = user.value?.address || '';
+                        currentView.value = 'profile';
+                        showDetailModal.value = false;
+                    } catch (e) {
+                        console.error(e);
+                    }
+                };
+
+                const updateProfile = async () => {
+                    try {
+                        await api(`/api/profile?phone=${encodeURIComponent(editPhone.value)}&address=${encodeURIComponent(editAddress.value)}`, {
+                            method: 'PUT'
+                        });
+                        user.value.phone = editPhone.value;
+                        user.value.address = editAddress.value;
+                        alert(lang.value === 'zh' ? '资料已更新' : 'Profile updated');
+                    } catch (e) {
+                        console.error(e);
+                    }
+                };
+
+                // Comment functions
+                const loadComments = async (petId) => {
+                    try {
+                        petComments.value = await api(`/api/pets/${petId}/comments`);
+                    } catch (e) {
+                        console.error(e);
+                    }
+                };
+
+                const addComment = async () => {
+                    if (!newComment.value.trim() || !selectedPet.value) return;
+                    try {
+                        await api(`/api/pets/${selectedPet.value.id}/comments?content=${encodeURIComponent(newComment.value)}`, {
+                            method: 'POST'
+                        });
+                        newComment.value = '';
+                        loadComments(selectedPet.value.id);
+                    } catch (e) {
+                        console.error(e);
+                    }
+                };
+
+                // Browsing History functions
+                const loadHistory = async () => {
+                    if (!user.value) return;
+                    try {
+                        browsingHistory.value = await api('/api/history');
+                    } catch (e) {
+                        console.error(e);
+                    }
+                };
+
+                const recordView = async (petId) => {
+                    if (!user.value) return;
+                    try {
+                        await api(`/api/history/${petId}`, { method: 'POST' });
+                    } catch (e) {
+                        console.error(e);
+                    }
+                };
+
+                const clearHistory = async () => {
+                    if (!confirm(lang.value === 'zh' ? '确定要清空浏览历史吗？' : 'Clear all browsing history?')) return;
+                    try {
+                        await api('/api/history', { method: 'DELETE' });
+                        browsingHistory.value = [];
+                    } catch (e) {
+                        console.error(e);
+                    }
+                };
+
+                const removeFromHistory = async (petId) => {
+                    try {
+                        await api(`/api/history/${petId}`, { method: 'DELETE' });
+                        browsingHistory.value = browsingHistory.value.filter(p => p.id !== petId);
+                    } catch (e) {
+                        console.error(e);
+                    }
+                };
+
+                // Helpers
+                const formatAge = (months) => {
+                    if (months < 12) return `${months} ${t('age.months')}`;
+                    const years = Math.floor(months / 12);
+                    const remainingMonths = months % 12;
+                    if (remainingMonths === 0) return `${years} ${years > 1 ? t('age.years') : t('age.year')}`;
+                    return `${years}${t('age.year')} ${remainingMonths}${t('age.months')}`;
+                };
+
+                const formatDate = (dateStr) => {
+                    return new Date(dateStr).toLocaleDateString();
+                };
+
+                const formatDateTime = (dateStr) => {
+                    const date = new Date(dateStr);
+                    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+                };
+
+                const handleImageError = (e) => {
+                    e.target.style.display = 'none';
+                };
+
+                // Watch view changes
+                watch(currentView, (view) => {
+                    if (view === 'manage') loadMyPets();
+                    if (view === 'applications') loadApplications();
+                    if (view === 'favorites') loadFavorites();
+                    if (view === 'messages') loadMessages();
+                    if (view === 'history') loadHistory();
+                });
+
+                // Watch selected pet for loading comments
+                watch(selectedPet, (pet) => {
+                    if (pet) {
+                        loadComments(pet.id);
+                    }
+                });
+
+                // Initialize
+                onMounted(() => {
+                    checkAuth();
+                    loadPets();
+                    loadStats();
+                });
+
+                return {
+                    lang, t, toggleLang,
+                    currentView, user, pets, myPets, favorites, applications, stats, selectedPet, preferences, prefTypes,
+                    conversations, currentChat, newMessage, profileUser, petComments, newComment, unreadCount, editPhone, editAddress,
+                    browsingHistory,
+                    showLoginModal, showRegisterModal, showDetailModal, showApplicationForm, showAddPetModal,
+                    loginForm, registerForm, applicationForm, newPet,
+                    loginError, registerError, applicationError, addPetError,
+                    filters,
+                    login, register, logout, loadPets, showPetDetail, toggleFavorite, isFavorite,
+                    submitApplication, updateApplicationStatus, savePreferences, handleFileSelect, addPet, deletePet,
+                    debounceSearch, formatAge, formatDate, formatDateTime, handleImageError,
+                    loadMessages, openChat, sendMessage, startChat, contactOwner,
+                    viewProfile, updateProfile, loadComments, addComment,
+                    loadHistory, clearHistory, removeFromHistory
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
